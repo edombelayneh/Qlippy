@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Upload, FileText, Code, X, Plus, Save, ChevronLeft } from "lucide-react"
+import { Upload, FileText, Code, X, Plus, Save, ArrowDownToLine } from "lucide-react"
 import Editor from '@monaco-editor/react'
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -167,13 +167,6 @@ export default function NewPluginPage() {
         <div className="flex flex-col h-screen bg-background">
           {/* Header */}
           <header className="flex h-16 items-center gap-4 border-b px-6">
-            
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/plugins">
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -195,7 +188,7 @@ export default function NewPluginPage() {
                 disabled={!toolName || !description || (!scriptContent && !uploadedContent) || !!nameError}
                 className="gap-2"
               >
-                <Save className="h-4 w-4" />
+                <ArrowDownToLine className="h-4 w-4" />
                 Save Plugin
               </Button>
             </div>
@@ -208,7 +201,6 @@ export default function NewPluginPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
                     Plugin Details
                   </CardTitle>
                 </CardHeader>

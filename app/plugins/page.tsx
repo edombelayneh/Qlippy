@@ -35,7 +35,7 @@ export default function PluginsPage() {
             </Breadcrumb>
 
             <div className="ml-auto">
-              <Button asChild className="gap-2">
+              <Button asChild variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground transition-colors">
                 <Link href="/plugins/new">
                   <Plus className="h-4 w-4" />
                   New Plugin
@@ -49,7 +49,6 @@ export default function PluginsPage() {
             <div className="max-w-4xl mx-auto">
               <div className="mb-8">
                 <h1 className="text-3xl font-bold flex items-center gap-3">
-                  <Blocks className="h-8 w-8" />
                   Plugins
                 </h1>
                 <p className="text-muted-foreground mt-2">
@@ -69,9 +68,9 @@ export default function PluginsPage() {
                     <p className="text-muted-foreground mb-6">
                       Create your first custom plugin to extend your AI assistant's capabilities
                     </p>
-                    <Button asChild>
+                    <Button asChild className="gap-2">
                       <Link href="/plugins/new">
-                        <Plus className="h-4 w-4 mr-2" />
+                        <Plus className="h-4 w-4" />
                         Create Your First Plugin
                       </Link>
                     </Button>
