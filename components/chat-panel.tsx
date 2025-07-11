@@ -2,19 +2,19 @@
 
 import * as React from "react"
 
-import { Bot, User, Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Share, Plus } from "lucide-react";
+import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Share, Plus } from "lucide-react";
 import { Button } from "./ui/button";
-import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
-import { SidebarTrigger } from "./ui/sidebar";
 import { Card, CardContent } from "./ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { NavActions } from "@/components/nav-actions";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator, BreadcrumbPage } from "./ui/breadcrumb";
 
 interface Message {
     id: string
@@ -247,7 +247,20 @@ export function ChatPanel() {
 
         {/* Header */}
         <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 bg-background">
-            <h2 className="font-normal text-2xl">{activeConversation?.title || "New Conversation"}</h2>
+            <div className="flex flex-row justify-between w-full">
+                <Breadcrumb>
+                <BreadcrumbList>
+                    <BreadcrumbItem>
+                    <BreadcrumbLink>Chats</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                    <BreadcrumbPage>New Conversation</BreadcrumbPage>
+                    </BreadcrumbItem>
+                </BreadcrumbList>
+                </Breadcrumb>
+                <NavActions />
+            </div>
         </header>
 
         {/* Chat Messages */}
