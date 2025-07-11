@@ -42,3 +42,32 @@
     "typescript": "^5"
   }
 }
+{
+  "name": "qlippy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edombelayneh/Qlippy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/edombelayneh/Qlippy/issues"
+  },
+  "homepage": "https://github.com/edombelayneh/Qlippy#readme",
+  "devDependencies": {
+    "electron": "^37.2.1"
+  },
+  "dependencies": {
+    "@picovoice/porcupine-node": "^3.0.6",
+    "@picovoice/pvrecorder-node": "^1.2.8"
+  }
+}
