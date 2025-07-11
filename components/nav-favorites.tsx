@@ -3,6 +3,7 @@
 import {
   ArrowUpRight,
   Link,
+  MessageCircleMore,
   MoreHorizontal,
   StarOff,
   Trash2,
@@ -38,7 +39,7 @@ export function NavFavorites({
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Favorites</SidebarGroupLabel>
+      <SidebarGroupLabel>Chats</SidebarGroupLabel>
       <SidebarMenu>
         {favorites.map((item) => (
           <SidebarMenuItem key={item.name}>
@@ -57,25 +58,11 @@ export function NavFavorites({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 className="w-56 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
+                side="bottom"
+                align="end"
               >
-                <DropdownMenuItem>
-                  <StarOff className="text-muted-foreground" />
-                  <span>Remove from Favorites</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Link className="text-muted-foreground" />
-                  <span>Copy Link</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ArrowUpRight className="text-muted-foreground" />
-                  <span>Open in New Tab</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
+                <DropdownMenuItem variant="destructive">
+                  <Trash2 className="text-muted-foreground"/>
                   <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -84,8 +71,8 @@ export function NavFavorites({
         ))}
         <SidebarMenuItem>
           <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontal />
-            <span>More</span>
+            <MessageCircleMore />
+            <span>All Chats</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

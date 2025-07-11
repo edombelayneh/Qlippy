@@ -2,13 +2,19 @@
 
 import * as React from "react"
 
-import { Bot, User, Loader2, Send } from "lucide-react";
+import { Bot, User, Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Share, Plus } from "lucide-react";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Card, CardContent } from "./ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 interface Message {
     id: string
@@ -29,7 +35,13 @@ interface Message {
     name: string
     description: string
     enabled: boolean
-  }  
+  }
+
+  interface AIModel {
+    id: string
+    name: string
+    description: string
+  }
 
 export function ChatPanel() {
     const [conversations, setConversations] = React.useState<Conversation[]>([
@@ -62,6 +74,7 @@ export function ChatPanel() {
       const [isPluginDialogOpen, setIsPluginDialogOpen] = React.useState(false)
       const [newPluginName, setNewPluginName] = React.useState("")
       const [newPluginDescription, setNewPluginDescription] = React.useState("")
+      const [selectedModel, setSelectedModel] = React.useState("gpt-4")
     
       const [plugins, setPlugins] = React.useState<Plugin[]>([
         {
@@ -83,9 +96,33 @@ export function ChatPanel() {
           enabled: true,
         },
       ])
+
+      const [availableModels] = React.useState<AIModel[]>([
+        {
+          id: "gpt-4",
+          name: "GPT-4",
+          description: "Most capable model, best for complex tasks"
+        },
+        {
+          id: "gpt-3.5-turbo",
+          name: "GPT-3.5 Turbo",
+          description: "Fast and efficient for most tasks"
+        },
+        {
+          id: "claude-3",
+          name: "Claude 3",
+          description: "Excellent for analysis and reasoning"
+        },
+        {
+          id: "llama-2",
+          name: "Llama 2",
+          description: "Open source alternative"
+        }
+      ])
     
       const activeConversation = conversations.find((c) => c.id === activeConversationId)
       const messagesEndRef = React.useRef<HTMLDivElement>(null)
+      const textareaRef = React.useRef<HTMLTextAreaElement>(null)
     
       const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -94,6 +131,18 @@ export function ChatPanel() {
       React.useEffect(() => {
         scrollToBottom()
       }, [activeConversation?.messages])
+
+      // Auto-resize textarea with max height constraint
+      React.useEffect(() => {
+        const textarea = textareaRef.current
+        if (textarea) {
+          // Reset height to calculate new scroll height
+          textarea.style.height = 'auto'
+          // Set height up to max of 120px, then let it scroll
+          const newHeight = Math.min(textarea.scrollHeight, 120)
+          textarea.style.height = newHeight + 'px'
+        }
+      }, [currentMessage])
     
       const handleSendMessage = async () => {
         if (!currentMessage.trim() || isGenerating) return
@@ -126,7 +175,7 @@ export function ChatPanel() {
           const assistantMessage: Message = {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: `I understand you said: "${userMessage.content}". This is a simulated response. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`,
+            content: `I understand you said: "${userMessage.content}". This is a simulated response using ${availableModels.find(m => m.id === selectedModel)?.name}. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`,
             timestamp: new Date(),
           }
     
@@ -150,6 +199,12 @@ export function ChatPanel() {
           e.preventDefault()
           handleSendMessage()
         }
+      }
+
+      const handleVoiceInput = () => {
+        // Voice input functionality would go here
+        console.log("Voice input activated")
+        textareaRef.current?.focus()
       }
     
       const createNewConversation = () => {
@@ -184,77 +239,209 @@ export function ChatPanel() {
           prev.map((plugin) => (plugin.id === pluginId ? { ...plugin, enabled: !plugin.enabled } : plugin)),
         )
       }
+
+      const currentModel = availableModels.find(m => m.id === selectedModel)
     
     return (
         <div className="flex flex-col h-full">
+
+        {/* Header */}
+        <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 bg-background">
+            <h2 className="font-normal text-2xl">{activeConversation?.title || "New Conversation"}</h2>
+        </header>
+
         {/* Chat Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4 max-w-4xl mx-auto">
-            {activeConversation?.messages.map((message) => (
-              <div key={message.id} className="space-y-2">
-                <div className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  {message.role === "assistant" && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary-foreground" />
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <div className="space-y-6 max-w-4xl mx-auto p-4 pb-6">
+              {activeConversation?.messages.map((message) => (
+                <div key={message.id} className="space-y-3">
+                  {message.role === "user" ? (
+                    // User Message - Card Style
+                    <div className="flex justify-end">
+                      <Card className="max-w-[80%] bg-primary text-primary-foreground">
+                        <CardContent className="p-4">
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        </CardContent>
+                      </Card>
                     </div>
-                  )}
-                  <Card
-                    className={`max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : ""}`}
-                  >
-                    <CardContent className="p-3">
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      <p className="text-xs opacity-70 mt-2">{message.timestamp.toLocaleTimeString()}</p>
-                    </CardContent>
-                  </Card>
-                  {message.role === "user" && (
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                      <User className="h-4 w-4" />
+                  ) : (
+                    // AI Response - Free Text with Actions
+                    <div className="space-y-3">
+                      <div className="prose prose-sm max-w-none">
+                        <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                          {message.content}
+                        </p>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                          onClick={() => console.log('Thumbs up')}
+                        >
+                          <ThumbsUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                          onClick={() => console.log('Thumbs down')}
+                        >
+                          <ThumbsDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                          onClick={() => navigator.clipboard.writeText(message.content)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                          onClick={() => console.log('Regenerate')}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                          onClick={() => console.log('Share')}
+                        >
+                          <Share className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
-                <Separator className="my-4" />
-              </div>
-            ))}
+              ))}
 
-            {isGenerating && (
-              <div className="flex gap-3 justify-start">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-primary-foreground" />
+              {isGenerating && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Thinking...</span>
+                  </div>
                 </div>
-                <Card>
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-muted-foreground">Thinking...</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+        </div>
 
-        {/* Message Input */}
-        <div className="border-t p-4">
+        {/* Message Input - Fixed at bottom */}
+        <div className="sticky bottom-0 flex-shrink-0 p-6 bg-background/95 backdrop-blur-sm">
           <div className="max-w-4xl mx-auto">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <Input
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isGenerating}
-                  className="pr-20"
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                  Enter ↵
-                </div>
-              </div>
-              <Button onClick={handleSendMessage} disabled={!currentMessage.trim() || isGenerating} size="icon">
-                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+            {/* Input Container */}
+            <div className="relative">
+              <Card className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200 focus-within:shadow-lg focus-within:border-ring/50 rounded-2xl overflow-hidden">
+                <CardContent className="p-0">
+                  {/* Textarea Area */}
+                  <div className="px-4 py-2 pb-2 max-h-32">
+                    <Textarea
+                      ref={textareaRef}
+                      value={currentMessage}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCurrentMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Ask Qlippy anything..."
+                      disabled={isGenerating}
+                      rows={2}
+                      className="border-0 bg-transparent resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/70 px-0 py-0 min-h-[48px] max-h-28 shadow-none overflow-y-auto w-full !bg-transparent focus:bg-transparent hover:bg-transparent"
+                    />
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="flex items-center justify-between px-4 py-3">
+                    {/* Left Side - Keyboard Shortcut Hint */}
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                        <Plus  />
+                      </Button>
+                    </div>
+
+                    {/* Right Side - Model Selector & Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      {/* Model Selector */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                          >
+                            <span>{currentModel?.name}</span>
+                            <ChevronDown className="ml-1 h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                          <div className="p-2 border-b">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              AI Model
+                            </div>
+                          </div>
+                          {availableModels.map((model) => (
+                            <DropdownMenuItem
+                              key={model.id}
+                              onClick={() => setSelectedModel(model.id)}
+                              className="flex items-start gap-3 p-3 cursor-pointer"
+                            >
+                              <div className="flex items-center justify-center w-4 h-4 mt-0.5">
+                                {selectedModel === model.id && (
+                                  <Check className="h-3 w-3 text-primary" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm">{model.name}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                  {model.description}
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Voice/Send Button */}
+                      {currentMessage.trim() ? (
+                        <Button
+                          onClick={handleSendMessage}
+                          disabled={isGenerating}
+                          size="sm"
+                          className="h-7 px-3 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                              <span className="text-xs">Sending...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="mr-1 h-3 w-3" />
+                              <span className="text-xs">Send</span>
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleVoiceInput}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                        >
+                          <Mic className="mr-1 h-3 w-3" />
+                          <span className="text-xs">Voice</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
