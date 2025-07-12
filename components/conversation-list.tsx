@@ -3,13 +3,15 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Folder, Plus, MoreHorizontal } from "lucide-react"
+import { Folder, MoreHorizontal, Trash2 } from "lucide-react"
 import { FolderSelector, FolderTag, FolderDialog } from "./folder-selector"
+import { ConfirmationDialog } from "./confirmation-dialog"
 
 interface Conversation {
   id: string
   title: string
   messages: any[]
+  messageCount: number
   lastUpdated: Date
   folder?: string
 }
@@ -31,6 +33,7 @@ interface ConversationListProps {
   onFolderSelect: (folderId: string | null) => void
   onAddFolder: (conversationId: string, folderId: string) => void
   onRemoveFolder: (conversationId: string) => void
+  onDeleteConversation?: (conversationId: string) => void
 }
 
 export function ConversationList({
@@ -42,10 +45,13 @@ export function ConversationList({
   selectedFolder,
   onFolderSelect,
   onAddFolder,
-  onRemoveFolder
+  onRemoveFolder,
+  onDeleteConversation
 }: ConversationListProps) {
   const [showFolderDialog, setShowFolderDialog] = React.useState(false)
   const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [conversationToDelete, setConversationToDelete] = React.useState<string | null>(null)
 
   // Filter conversations by selected folder
   const filteredConversations = selectedFolder 
@@ -57,23 +63,11 @@ export function ConversationList({
   }
 
   return (
-    <div className="space-y-4">
-      {/* New Conversation Button */}
-      <Button 
-        onClick={onNewConversation}
-        className="w-full justify-start"
-        variant="outline"
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        New Conversation
-      </Button>
-
-      {/* Folder Selector - Removed since it's now in the sidebar */}
-
+    <div className="space-y-4 px-3">
       {/* Conversations */}
       <div className="space-y-2">
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {selectedFolder ? getFolderInfo(selectedFolder)?.name : 'Recent Conversations'}
+          {selectedFolder ? getFolderInfo(selectedFolder)?.name : 'Chats'}
         </div>
         
         <div className="space-y-1">
@@ -96,7 +90,7 @@ export function ConversationList({
                       {conversation.title}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {conversation.messages.length} messages
+                      {conversation.messageCount} messages
                     </div>
                   </div>
                   
@@ -110,7 +104,7 @@ export function ConversationList({
                   )}
                   
                   {/* Actions Menu */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -123,6 +117,20 @@ export function ConversationList({
                     >
                       <MoreHorizontal className="h-3 w-3" />
                     </Button>
+                    {onDeleteConversation && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConversationToDelete(conversation.id)
+                          setShowDeleteDialog(true)
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -138,6 +146,22 @@ export function ConversationList({
         folders={folders}
         onAddFolder={onAddFolder}
         conversationId={editingConversationId || ''}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={() => {
+          if (conversationToDelete && onDeleteConversation) {
+            onDeleteConversation(conversationToDelete)
+            setConversationToDelete(null)
+          }
+        }}
+        title="Delete Conversation"
+        description="Are you sure you want to delete this conversation? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </div>
   )

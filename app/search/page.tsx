@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, SquarePen, Clock, Trash2, MessageSquare } from "lucide-react"
+import { Search, SquarePen, Clock, Trash2, MessageSquare, Filter, X, ChevronDown, ChevronUp, User, Bot } from "lucide-react"
 import Link from "next/link"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 import {
   Breadcrumb,
@@ -20,98 +27,177 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import { useUserContext } from "@/contexts/user-context"
+import { qlippyAPI, Conversation, SearchResult } from "@/lib/api"
+import { useRouter } from "next/navigation"
 
-// Sample conversation data - in a real app this would come from your backend
-const sampleConversations = [
-  {
-    id: "1",
-    title: "Getting Started with Qlippy",
-    lastMessage: "Hello! How can you help me today?",
-    timestamp: "31 minutes ago",
-    messageCount: 8
-  },
-  {
-    id: "2", 
-    title: "Python Plugin Development",
-    lastMessage: "Can you help me create a custom plugin for data processing?",
-    timestamp: "35 minutes ago",
-    messageCount: 15
-  },
-  {
-    id: "3",
-    title: "AI Model Comparison",
-    lastMessage: "What are the differences between GPT-4 and Claude?",
-    timestamp: "35 minutes ago", 
-    messageCount: 12
-  },
-  {
-    id: "4",
-    title: "Voice Commands Setup",
-    lastMessage: "How do I configure the wake word detection?",
-    timestamp: "1 hour ago",
-    messageCount: 6
-  },
-  {
-    id: "5",
-    title: "Workflow Automation Ideas",
-    lastMessage: "I need help automating my daily tasks",
-    timestamp: "14 hours ago",
-    messageCount: 23
-  },
-  {
-    id: "6",
-    title: "Code Review Assistant",
-    lastMessage: "Can you review this React component for me?",
-    timestamp: "2 days ago",
-    messageCount: 18
-  },
-  {
-    id: "7",
-    title: "Data Analysis Project",
-    lastMessage: "Help me analyze this CSV dataset",
-    timestamp: "3 days ago",
-    messageCount: 31
-  },
-  {
-    id: "8",
-    title: "Creative Writing Collaboration",
-    lastMessage: "Let's work on a short story together",
-    timestamp: "1 week ago",
-    messageCount: 45
-  }
-]
+interface SearchFilters {
+  showUserMessages: boolean;
+  showAssistantMessages: boolean;
+  sortBy: 'relevance' | 'date' | 'title';
+}
 
 export default function SearchPage() {
+  const { user, loading: userLoading } = useUserContext()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [conversations, setConversations] = React.useState(sampleConversations)
-  const [filteredConversations, setFilteredConversations] = React.useState(sampleConversations)
+  const [searchResults, setSearchResults] = React.useState<SearchResult | null>(null)
+  const [isSearching, setIsSearching] = React.useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [conversationToDelete, setConversationToDelete] = React.useState<string | null>(null)
+  const [showFilters, setShowFilters] = React.useState(false)
+  const [filters, setFilters] = React.useState<SearchFilters>({
+    showUserMessages: true,
+    showAssistantMessages: true,
+    sortBy: 'relevance'
+  })
 
-  React.useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredConversations(conversations)
-    } else {
-      const filtered = conversations.filter(conv => 
-        conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      setFilteredConversations(filtered)
+  // Debounced search
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
+
+  const performSearch = React.useCallback(async (query: string) => {
+    if (!user || !query.trim()) {
+      setSearchResults(null)
+      return
     }
-  }, [searchQuery, conversations])
+
+    setIsSearching(true)
+    try {
+      const results = await qlippyAPI.searchConversations(user.id, query.trim())
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [user])
+
+  // Debounced search effect
+  React.useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (searchQuery.trim()) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performSearch(searchQuery)
+      }, 300) // 300ms debounce
+    } else {
+      setSearchResults(null)
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchQuery, performSearch])
 
   const handleDeleteClick = (conversationId: string, event: React.MouseEvent) => {
-    event.stopPropagation() // Prevent card click
+    event.stopPropagation()
     setConversationToDelete(conversationId)
     setShowDeleteDialog(true)
   }
 
-  const confirmDeleteConversation = () => {
-    if (conversationToDelete) {
-      const updatedConversations = conversations.filter(conv => conv.id !== conversationToDelete)
-      setConversations(updatedConversations)
+  const confirmDeleteConversation = async () => {
+    if (conversationToDelete && user) {
+      try {
+        await qlippyAPI.deleteConversation(conversationToDelete)
+        // Refresh search results
+        if (searchQuery.trim()) {
+          await performSearch(searchQuery)
+        }
+      } catch (error) {
+        console.error('Failed to delete conversation:', error)
+      }
       setConversationToDelete(null)
     }
+  }
+
+  const handleConversationClick = (conversationId: string) => {
+    router.push(`/chat?conversation=${conversationId}`)
+  }
+
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text
+    
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    
+    return parts.map((part, index) => 
+      regex.test(part) ? (
+        <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 px-1 rounded">
+          {part}
+        </mark>
+      ) : part
+    )
+  }
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor(diffInHours * 60)
+      return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`
+    } else if (diffInHours < 24) {
+      const hours = Math.floor(diffInHours)
+      return `${hours} hour${hours !== 1 ? 's' : ''} ago`
+    } else if (diffInHours < 168) { // 7 days
+      const days = Math.floor(diffInHours / 24)
+      return `${days} day${days !== 1 ? 's' : ''} ago`
+    } else {
+      return date.toLocaleDateString()
+    }
+  }
+
+  const filteredResults = React.useMemo(() => {
+    if (!searchResults) return []
+    
+    let results = searchResults.results
+
+    // Filter by message type
+    if (!filters.showUserMessages || !filters.showAssistantMessages) {
+      results = results.map(conv => ({
+        ...conv,
+        matching_messages: conv.matching_messages?.filter(msg => {
+          if (!filters.showUserMessages && msg.role === 'user') return false
+          if (!filters.showAssistantMessages && msg.role === 'assistant') return false
+          return true
+        }) || []
+      })).filter(conv => conv.matching_messages && conv.matching_messages.length > 0)
+    }
+
+    // Sort results
+    switch (filters.sortBy) {
+      case 'date':
+        results.sort((a, b) => new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime())
+        break
+      case 'title':
+        results.sort((a, b) => a.title.localeCompare(b.title))
+        break
+      case 'relevance':
+      default:
+        // Already sorted by relevance from backend
+        break
+    }
+
+    return results
+  }, [searchResults, filters])
+
+  if (userLoading) {
+    return (
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="flex items-center justify-center h-screen">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    )
   }
 
   return (
@@ -145,36 +231,123 @@ export default function SearchPage() {
               {/* Page Header */}
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold flex items-center gap-3">
-                  Search Chats...
+                  Search Chats
                 </h1>
                 <p className="text-muted-foreground">
-                    Search through your conversation history to quickly find previous discussions
+                  Search through your conversation history to quickly find previous discussions
                 </p>
               </div>
 
               {/* Search Input */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search your chats..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12 text-base"
-                />
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search your chats..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 h-12 text-base"
+                  />
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+
+                {/* Filters */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="gap-2"
+                  >
+                    <Filter className="h-4 w-4" />
+                    Filters
+                    {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                  
+                  {searchResults && (
+                    <Badge variant="secondary">
+                      {searchResults.total_results} result{searchResults.total_results !== 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Filter Options */}
+                {showFilters && (
+                  <Card>
+                    <CardContent className="p-4 space-y-4">
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Message Types</h4>
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={filters.showUserMessages}
+                              onChange={(e) => setFilters(prev => ({ ...prev, showUserMessages: e.target.checked }))}
+                              className="rounded"
+                            />
+                            <User className="h-4 w-4" />
+                            User messages
+                          </label>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={filters.showAssistantMessages}
+                              onChange={(e) => setFilters(prev => ({ ...prev, showAssistantMessages: e.target.checked }))}
+                              className="rounded"
+                            />
+                            <Bot className="h-4 w-4" />
+                            Assistant messages
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Sort By</h4>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between">
+                              {filters.sortBy === 'relevance' ? 'Relevance' : 
+                               filters.sortBy === 'date' ? 'Date' : 'Title'}
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: 'relevance' }))}>
+                              Relevance
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: 'date' }))}>
+                              Date
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setFilters(prev => ({ ...prev, sortBy: 'title' }))}>
+                              Title
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Search Results */}
               <div className="space-y-3">
-                {searchQuery && (
-                  <div className="text-sm text-muted-foreground">
-                    {filteredConversations.length === 0 
-                      ? "No chats found" 
-                      : `Found ${filteredConversations.length} chat${filteredConversations.length === 1 ? '' : 's'}`
-                    }
+                {isSearching && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3"></div>
+                    <span className="text-muted-foreground">Searching...</span>
                   </div>
                 )}
 
-                {filteredConversations.length === 0 && searchQuery ? (
+                {searchQuery && !isSearching && filteredResults.length === 0 && (
                   <Card>
                     <CardContent className="text-center py-12">
                       <Search className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
@@ -184,30 +357,65 @@ export default function SearchPage() {
                       </p>
                     </CardContent>
                   </Card>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredConversations.map((conversation) => (
+                )}
+
+                {!isSearching && filteredResults.length > 0 && (
+                  <div className="space-y-3">
+                    {filteredResults.map((conversation) => (
                       <Card 
                         key={conversation.id} 
                         className="group hover:bg-muted/50 transition-colors cursor-pointer relative"
+                        onClick={() => handleConversationClick(conversation.id)}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-medium truncate">
-                                {conversation.title}
-                              </h3>
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {conversation.lastMessage}
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-medium truncate">
+                                  {highlightText(conversation.title, searchQuery)}
+                                </h3>
+                                {conversation.match_count && conversation.match_count > 0 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {conversation.match_count} match{conversation.match_count !== 1 ? 'es' : ''}
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                                {conversation.last_message_preview}
                               </p>
-                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+
+                              {/* Matching Messages */}
+                              {conversation.matching_messages && conversation.matching_messages.length > 0 && (
+                                <div className="space-y-2 mb-3">
+                                  {conversation.matching_messages.map((message) => (
+                                    <div key={message.id} className="bg-muted/50 rounded-lg p-3">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        {message.role === 'user' ? (
+                                          <User className="h-3 w-3 text-blue-500" />
+                                        ) : (
+                                          <Bot className="h-3 w-3 text-green-500" />
+                                        )}
+                                        <span className="text-xs text-muted-foreground">
+                                          {message.role === 'user' ? 'You' : 'Assistant'} • {formatTimestamp(message.timestamp)}
+                                        </span>
+                                      </div>
+                                      <p className="text-sm">
+                                        {highlightText(message.preview, searchQuery)}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                 <div className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  Last message {conversation.timestamp}
+                                  Last message {formatTimestamp(conversation.last_updated)}
                                 </div>
                                 <div className="flex items-center gap-1">
                                   <MessageSquare className="h-3 w-3" />
-                                  {conversation.messageCount} messages
+                                  {conversation.message_count} messages
                                 </div>
                               </div>
                             </div>

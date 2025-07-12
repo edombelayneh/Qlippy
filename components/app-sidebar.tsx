@@ -12,6 +12,8 @@ import {
 import { NavFavorites } from "@/components/nav-favorites"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
+import { NavSpaces } from "@/components/nav-spaces"
+import { ConversationList } from "@/components/conversation-list"
 import {
   Sidebar,
   SidebarContent,
@@ -21,11 +23,91 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {}
+interface Space {
+  id: string
+  name: string
+  icon: string
+  color: string
+  conversationCount?: number
+}
 
-export function AppSidebar({ ...props }: AppSidebarProps) {
+interface Conversation {
+  id: string
+  title: string
+  messages: any[]
+  messageCount: number
+  lastUpdated: Date
+  folder?: string
+}
+
+interface Plugin {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+}
+
+interface AIModel {
+  id: string
+  name: string
+  description: string
+}
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  // Legacy props for backward compatibility
+  spaces?: Space[]
+  selectedSpace?: string | null
+  onSpaceSelect?: (spaceId: string | null) => void
+  onAddSpace?: () => void
+  
+  // New props for conversation management
+  conversations?: Conversation[]
+  activeConversationId?: string | null
+  onConversationSelect?: (id: string) => void
+  onCreateConversation?: () => void
+  onDeleteConversation?: (conversationId: string) => void
+  onAddFolder?: (conversationId: string, folderId: string) => void
+  onRemoveFolder?: (conversationId: string) => void
+  
+  // Plugin and model management
+  plugins?: Plugin[]
+  onTogglePlugin?: (pluginId: string) => void
+  availableModels?: AIModel[]
+  selectedModel?: string
+  onModelSelect?: (modelId: string) => void
+  
+  // Space selection for new conversations
+  selectedSpaceForNewConversation?: string | null
+  onSelectSpaceForNewConversation?: (spaceId: string | null) => void
+}
+
+export function AppSidebar({ 
+  spaces = [],
+  selectedSpace = null,
+  onSpaceSelect,
+  onAddSpace,
+  conversations = [],
+  activeConversationId,
+  onConversationSelect,
+  onCreateConversation,
+  onDeleteConversation,
+  onAddFolder,
+  onRemoveFolder,
+  plugins = [],
+  onTogglePlugin,
+  availableModels = [],
+  selectedModel,
+  onModelSelect,
+  selectedSpaceForNewConversation,
+  onSelectSpaceForNewConversation,
+  ...props 
+}: AppSidebarProps) {
+  const { state } = useSidebar()
+  const isExpanded = state === "expanded"
+
   // This is sample data.
   const data = {
     teams: [
@@ -40,6 +122,7 @@ export function AppSidebar({ ...props }: AppSidebarProps) {
         title: "New Chat",
         url: "/chat",
         icon: SquarePen,
+        onClick: onCreateConversation,
       },
       {
         title: "Search Chats",
@@ -50,7 +133,6 @@ export function AppSidebar({ ...props }: AppSidebarProps) {
         title: "Plugins",
         url: "/plugins",
         icon: Blocks,
-        // isActive: true,
       },
     ],
     navSecondary: [
@@ -58,58 +140,6 @@ export function AppSidebar({ ...props }: AppSidebarProps) {
         title: "Settings",
         url: "/settings",
         icon: Settings,
-      },
-    ],
-    favorites: [
-      {
-        name: "Project Management & Task Tracking",
-        url: "#",
-        emoji: "📊",
-      },
-      {
-        name: "Family Recipe Collection & Meal Planning",
-        url: "#",
-        emoji: "🍳",
-      },
-      {
-        name: "Fitness Tracker & Workout Routines",
-        url: "#",
-        emoji: "💪",
-      },
-      {
-        name: "Book Notes & Reading List",
-        url: "#",
-        emoji: "📚",
-      },
-      {
-        name: "Sustainable Gardening Tips & Plant Care",
-        url: "#",
-        emoji: "🌱",
-      },
-      {
-        name: "Language Learning Progress & Resources",
-        url: "#",
-        emoji: "🗣️",
-      },
-      {
-        name: "Home Renovation Ideas & Budget Tracker",
-        url: "#",
-        emoji: "🏠",
-      },
-      {
-        name: "Personal Finance & Investment Portfolio",
-        url: "#",
-        emoji: "💰",
-      },
-      {
-        name: "Movie & TV Show Watchlist with Reviews",
-        url: "#",
-        emoji: "🎬",
-      },
-      {
-        name: "Daily Habit Tracker & Goal Setting",
-        url: "#",
-        emoji: "✅",
       },
     ],
   }
@@ -132,7 +162,36 @@ export function AppSidebar({ ...props }: AppSidebarProps) {
         <NavMain items={data.navMain} />
       </SidebarHeader>
       <SidebarContent>
-        <NavFavorites favorites={data.favorites} />
+        {/* Show spaces when sidebar is expanded */}
+        {isExpanded && (
+          <NavSpaces 
+            spaces={spaces}
+            selectedSpace={selectedSpace}
+            onSpaceSelect={onSpaceSelect || (() => {})}
+            onAddSpace={onAddSpace}
+          />
+        )}
+        
+        {/* Show conversations when sidebar is expanded and there are conversations */}
+        {isExpanded && conversations.length > 0 && (
+          <ConversationList
+            conversations={conversations}
+            activeConversationId={activeConversationId || ""}
+            onConversationSelect={onConversationSelect || (() => {})}
+            onNewConversation={onCreateConversation || (() => {})}
+            folders={spaces.map(space => ({
+              id: space.id,
+              name: space.name,
+              icon: space.icon,
+              color: space.color
+            }))}
+            selectedFolder={selectedSpace}
+            onFolderSelect={onSpaceSelect || (() => {})}
+            onAddFolder={onAddFolder || (() => {})}
+            onRemoveFolder={onRemoveFolder || (() => {})}
+            onDeleteConversation={onDeleteConversation}
+          />
+        )}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarRail />

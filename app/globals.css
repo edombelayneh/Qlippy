@@ -260,6 +260,15 @@ html.starry {
     @apply bg-background text-foreground;
   }
   
+  /* Ensure proper height for chat layout */
+  html, body {
+    height: 100%;
+  }
+  
+  #__next {
+    height: 100%;
+  }
+  
   /* Ensure custom themes override default styles */
   html.pastels {
     color-scheme: light;

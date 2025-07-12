@@ -9,8 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "electron": "electron .",
-    "start:hotword": "electron electron.js",
-    "start:server": "python server.py"
+    "start:hotword": "electron main.js",
+    "setup": "./setup-env.sh"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
