@@ -1,15 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Upload, FileText, Code, X, Plus, Save, ArrowDownToLine } from "lucide-react"
+import { Upload, Code, ArrowDownToLine } from "lucide-react"
 import Editor from '@monaco-editor/react'
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+
 import {
   Tabs,
   TabsContent,
@@ -25,7 +25,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
 import {
   SidebarInset,
   SidebarProvider,
@@ -40,6 +40,7 @@ export default function NewPluginPage() {
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null)
   const [activeTab, setActiveTab] = React.useState("script")
   const [nameError, setNameError] = React.useState("")
+  const [isDragging, setIsDragging] = React.useState(false)
 
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
@@ -89,30 +90,60 @@ export default function NewPluginPage() {
     }
   }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (file: File) => {
+    if (file.name.endsWith('.py')) {
+      setSelectedFile(file)
+      // Read file content
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setUploadedContent(e.target?.result as string || "")
+        setActiveTab("upload") // Switch to upload tab when file is selected
+      }
+      reader.readAsText(file)
+    } else {
+      toast.error("Please select a Python (.py) file")
+    }
+  }
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      if (file.name.endsWith('.py')) {
-        setSelectedFile(file)
-        // Read file content
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          setUploadedContent(e.target?.result as string || "")
-          setActiveTab("upload") // Switch to upload tab when file is selected
-        }
-        reader.readAsText(file)
-      } else {
-        alert("Please select a Python (.py) file")
-        event.target.value = ""
-      }
+      handleFileSelect(file)
     }
   }
 
   const removeFile = () => {
     setSelectedFile(null)
     setUploadedContent("")
+    setActiveTab("script")
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
+    }
+  }
+  
+
+  // Drag and drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const files = Array.from(e.dataTransfer.files)
+    const pythonFile = files.find(file => file.name.endsWith('.py'))
+    
+    if (pythonFile) {
+      handleFileSelect(pythonFile)
+    } else {
+      toast.error("Please drop a Python (.py) file")
     }
   }
 
@@ -122,13 +153,13 @@ export default function NewPluginPage() {
     }
     
     if (!description.trim()) {
-      alert("Please provide a description for your plugin")
+      toast.error("Please provide a description for your plugin")
       return
     }
 
     const currentContent = activeTab === "script" ? scriptContent : uploadedContent
     if (!currentContent.trim()) {
-      alert("Please provide Python script content")
+      toast.error("Please provide Python script content")
       return
     }
 
@@ -140,7 +171,7 @@ export default function NewPluginPage() {
       filename: selectedFile?.name
     })
 
-    alert("Plugin saved successfully!")
+    toast.success("Plugin saved successfully!")
     
     // Navigate back to plugins page
     router.push("/plugins")
@@ -196,95 +227,6 @@ export default function NewPluginPage() {
 
           {/* Main Content */}
           <div className="flex flex-1 overflow-hidden">
-            {/* Left Sidebar - Plugin Details */}
-            <div className="w-80 border-r bg-muted/30 p-6 overflow-y-auto">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Plugin Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Tool Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tool-name">
-                      Tool Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="tool-name"
-                      placeholder="e.g., data_processor"
-                      value={toolName}
-                      onChange={(e) => handleToolNameChange(e.target.value)}
-                      className={nameError ? "border-destructive" : ""}
-                    />
-                    {nameError && (
-                      <p className="text-sm text-destructive">{nameError}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Must be lowercase with underscores (snake_case)
-                    </p>
-                  </div>
-
-                  {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="description">
-                      Description <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="description"
-                      placeholder="Brief description of what this tool does"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </div>
-
-                  {/* File Upload Section */}
-                  <div className="space-y-4">
-                    <Label>Upload Python File</Label>
-                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
-                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Upload .py file</p>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".py"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          Choose File
-                        </Button>
-                      </div>
-                    </div>
-
-                    {selectedFile && (
-                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          <span className="text-sm font-medium">{selectedFile.name}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {(selectedFile.size / 1024).toFixed(1)}KB
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={removeFile}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
             {/* Right Side - Code Editor */}
             <div className="flex-1 flex flex-col">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1">
@@ -294,9 +236,17 @@ export default function NewPluginPage() {
                       <Code className="h-4 w-4" />
                       Write Script
                     </TabsTrigger>
-                    <TabsTrigger value="upload" className="flex items-center gap-2 relative">
+                    <TabsTrigger 
+                      value="upload" 
+                      className="flex items-center gap-2 relative cursor-pointer"
+                      onClick={() => {
+                        if (activeTab !== "upload") {
+                          fileInputRef.current?.click()
+                        }
+                      }}
+                    >
                       <Upload className="h-4 w-4" />
-                      Uploaded File
+                      Upload File
                       {selectedFile && (
                         <Badge variant="secondary" className="ml-1 text-xs h-4 px-1">
                           {selectedFile.name.split('.')[0]}
@@ -306,35 +256,46 @@ export default function NewPluginPage() {
                   </TabsList>
                   
                   {activeTab === "script" && (
-                    <div className="mt-4 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium">Python Script Editor</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Write your Python function with proper docstrings and error handling
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setScriptContent(exampleScript)}
-                      >
-                        Insert Example
-                      </Button>
+                    <div className="mt-4">
+                      <h3 className="font-medium">Python Script Editor</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Write your Python function or drag and drop a .py file
+                      </p>
                     </div>
                   )}
                   
-                  {activeTab === "upload" && uploadedContent && (
+                  {activeTab === "upload" && (
                     <div className="mt-4">
-                      <h3 className="font-medium">File Content Preview</h3>
+                      <h3 className="font-medium">Upload Python File</h3>
                       <p className="text-sm text-muted-foreground">
-                        Review and edit your uploaded Python file
+                        Click to browse files or drag and drop a .py file
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* Code Editor Area */}
-                <div className="flex-1 relative">
+                {/* Code Editor Area with Drag and Drop */}
+                <div 
+                  className="flex-1 relative"
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".py"
+                    onChange={handleFileInputChange}
+                    className="hidden"
+                  />
+
+                  {/* Drag overlay */}
+                  {isDragging && (
+                    <div className="absolute inset-0 bg-blue-50/50 border-2 border-dashed border-blue-500 z-10 dark:bg-blue-950/20">
+                    </div>
+                  )}
+
                   <TabsContent value="script" className="h-full m-0 border-0 p-0">
                     <Editor
                       height="100%"
@@ -387,11 +348,14 @@ export default function NewPluginPage() {
                         }}
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <div 
+                        className="flex items-center justify-center h-full text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
                         <div className="text-center">
-                          <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p className="text-lg font-medium">No file uploaded</p>
-                          <p className="text-sm">Upload a Python file to see its content here</p>
+                          <Upload className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                          <p className="text-xl font-medium mb-2">Upload Python File</p>
+                          <p className="text-sm mb-4">Click to browse files or drag and drop a .py file</p>
                         </div>
                       </div>
                     )}
