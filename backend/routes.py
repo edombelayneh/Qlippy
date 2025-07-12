@@ -232,6 +232,74 @@ def delete_plugin(plugin_id):
     
     return jsonify({'message': 'Plugin deleted successfully'})
 
+# Search routes
+@api.route('/users/<user_id>/search', methods=['GET'])
+def search_conversations(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'error': 'Search query is required'}), 400
+    
+    # Search in conversations (title and messages)
+    conversations = []
+    
+    # Search by conversation title
+    title_matches = Conversation.query.filter(
+        Conversation.user_id == user_id,
+        Conversation.title.ilike(f'%{query}%')
+    ).all()
+    
+    # Search by message content
+    message_matches = db.session.query(Conversation).join(Message).filter(
+        Conversation.user_id == user_id,
+        Message.content.ilike(f'%{query}%')
+    ).distinct().all()
+    
+    # Combine and deduplicate results
+    all_matches = list(set(title_matches + message_matches))
+    
+    for conv in all_matches:
+        # Get the last message for preview
+        last_message = Message.query.filter_by(conversation_id=conv.id).order_by(Message.timestamp.desc()).first()
+        
+        # Find matching messages for this conversation
+        matching_messages = Message.query.filter(
+            Message.conversation_id == conv.id,
+            Message.content.ilike(f'%{query}%')
+        ).all()
+        
+        conv_data = conv.to_dict()
+        conv_data['last_message_preview'] = (
+            last_message.content[:100] + '...' 
+            if last_message and len(last_message.content) > 100 
+            else (last_message.content if last_message else '')
+        )
+        conv_data['matching_messages'] = [
+            {
+                'id': msg.id,
+                'role': msg.role,
+                'content': msg.content,
+                'timestamp': msg.timestamp.isoformat(),
+                'preview': msg.content[:150] + '...' if len(msg.content) > 150 else msg.content
+            }
+            for msg in matching_messages[:3]  # Limit to 3 matching messages per conversation
+        ]
+        conv_data['match_count'] = len(matching_messages)
+        
+        conversations.append(conv_data)
+    
+    # Sort by relevance (conversations with more matches first, then by last updated)
+    conversations.sort(key=lambda x: (x['match_count'], x['last_updated']), reverse=True)
+    
+    return jsonify({
+        'query': query,
+        'results': conversations,
+        'total_results': len(conversations)
+    })
+
 # Health check
 @api.route('/health', methods=['GET'])
 def health_check():

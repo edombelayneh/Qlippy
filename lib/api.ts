@@ -28,6 +28,20 @@ export interface Conversation {
   user_id: string;
   messages?: Message[];
   last_message_preview?: string;
+  matching_messages?: {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    preview: string;
+  }[];
+  match_count?: number;
+}
+
+export interface SearchResult {
+  query: string;
+  results: Conversation[];
+  total_results: number;
 }
 
 export interface Plugin {
@@ -186,6 +200,11 @@ class QlippyAPI {
     return this.request(`/plugins/${pluginId}`, {
       method: 'DELETE',
     });
+  }
+
+  // Search functionality
+  async searchConversations(userId: string, query: string): Promise<SearchResult> {
+    return this.request(`/users/${userId}/search?q=${encodeURIComponent(query)}`);
   }
 }
 
