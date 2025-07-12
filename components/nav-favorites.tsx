@@ -1,20 +1,12 @@
 "use client"
 
+import * as React from "react"
 import {
-  ArrowUpRight,
-  Link,
-  MoreHorizontal,
-  StarOff,
+  MessageCircleMore,
   Trash2,
 } from "lucide-react"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -24,6 +16,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 
 export function NavFavorites({
   favorites,
@@ -35,10 +28,25 @@ export function NavFavorites({
   }[]
 }) {
   const { isMobile } = useSidebar()
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
+  const [itemToDelete, setItemToDelete] = React.useState<string | null>(null)
+
+  const handleDeleteClick = (itemName: string) => {
+    setItemToDelete(itemName)
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDeleteItem = () => {
+    if (itemToDelete) {
+      console.log('Delete chat:', itemToDelete)
+      // Here you would handle the actual deletion logic
+      setItemToDelete(null)
+    }
+  }
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Favorites</SidebarGroupLabel>
+      <SidebarGroupLabel>Chats</SidebarGroupLabel>
       <SidebarMenu>
         {favorites.map((item) => (
           <SidebarMenuItem key={item.name}>
@@ -48,47 +56,39 @@ export function NavFavorites({
                 <span>{item.name}</span>
               </a>
             </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction showOnHover>
-                  <MoreHorizontal />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-56 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <StarOff className="text-muted-foreground" />
-                  <span>Remove from Favorites</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Link className="text-muted-foreground" />
-                  <span>Copy Link</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <ArrowUpRight className="text-muted-foreground" />
-                  <span>Open in New Tab</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <SidebarMenuAction 
+              showOnHover
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteClick(item.name)
+              }}
+            >
+              <Trash2 />
+              <span className="sr-only">Delete chat</span>
+            </SidebarMenuAction>
           </SidebarMenuItem>
         ))}
         <SidebarMenuItem>
-          <SidebarMenuButton className="text-sidebar-foreground/70">
-            <MoreHorizontal />
-            <span>More</span>
+          <SidebarMenuButton asChild className="text-sidebar-foreground/70">
+            <a href="/search" title="All Chats">
+              <MessageCircleMore />
+              <span>All Chats</span>
+            </a>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={confirmDeleteItem}
+        title="Delete chat?"
+        description="Are you sure you want to delete this chat?"
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </SidebarGroup>
   )
 }
