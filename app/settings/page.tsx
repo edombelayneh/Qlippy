@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { NavActions } from "@/components/nav-actions"
 import {
@@ -85,7 +86,23 @@ const settingsCategories: SettingsCategory[] = [
 ]
 
 export default function SettingsPage() {
-  const [activeCategory, setActiveCategory] = React.useState("appearance")
+  const searchParams = useSearchParams()
+  const categoryParam = searchParams.get('category')
+  
+  // Set initial category based on URL parameter or default to appearance
+  const [activeCategory, setActiveCategory] = React.useState(() => {
+    if (categoryParam && settingsCategories.some(cat => cat.id === categoryParam)) {
+      return categoryParam
+    }
+    return "appearance"
+  })
+
+  // Update active category when URL parameter changes
+  React.useEffect(() => {
+    if (categoryParam && settingsCategories.some(cat => cat.id === categoryParam)) {
+      setActiveCategory(categoryParam)
+    }
+  }, [categoryParam])
 
   const renderSettingsContent = () => {
     switch (activeCategory) {
