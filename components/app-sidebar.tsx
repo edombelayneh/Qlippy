@@ -12,7 +12,6 @@ import {
 import { NavFavorites } from "@/components/nav-favorites"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
-import { NavSpaces } from "@/components/nav-spaces"
 import {
   Sidebar,
   SidebarContent,
@@ -24,28 +23,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 
-interface Space {
-  id: string
-  name: string
-  icon: string
-  color: string
-  conversationCount?: number
-}
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {}
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  spaces?: Space[]
-  selectedSpace?: string | null
-  onSpaceSelect?: (spaceId: string | null) => void
-  onAddSpace?: () => void
-}
-
-export function AppSidebar({ 
-  spaces = [],
-  selectedSpace = null,
-  onSpaceSelect,
-  onAddSpace,
-  ...props 
-}: AppSidebarProps) {
+export function AppSidebar({ ...props }: AppSidebarProps) {
   // This is sample data.
   const data = {
     teams: [
@@ -152,12 +132,6 @@ export function AppSidebar({
         <NavMain items={data.navMain} />
       </SidebarHeader>
       <SidebarContent>
-        <NavSpaces 
-          spaces={spaces}
-          selectedSpace={selectedSpace}
-          onSpaceSelect={onSpaceSelect || (() => {})}
-          onAddSpace={onAddSpace}
-        />
         <NavFavorites favorites={data.favorites} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

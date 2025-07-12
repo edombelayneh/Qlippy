@@ -1,102 +1,34 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, MoreHorizontal, Edit, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
-import { ConversationList } from "@/components/conversation-list"
-import { AddSpaceDialog } from "@/components/add-space-dialog"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
 
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
-}
-
-interface Conversation {
-  id: string
-  title: string
-  messages: Message[]
-  lastUpdated: Date
-  folder?: string // Optional folder tag
-}
-
-interface Plugin {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-}
-
-interface AIModel {
-  id: string
-  name: string
-  description: string
-}
-
-interface UploadedFile {
-  id: string
-  file: File
-  preview?: string
-  type: 'image' | 'document' | 'video' | 'audio'
-}
+import { ChatHeader } from "@/components/chat/chat-header"
+import { MessageList } from "@/components/chat/message-list"
+import { ChatInput } from "@/components/chat/chat-input"
+import { Message, Conversation, AIModel } from "@/lib/types"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { toast } from "sonner"
 
 export default function ChatPage() {
-  const [isLoading, setIsLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    // Simulate app initialization
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 2000) // Show loader for 2 seconds
-
-    return () => clearTimeout(timer)
-  }, [])
-
+  const [currentMessage, setCurrentMessage] = React.useState("")
+  const [isGenerating, setIsGenerating] = React.useState(false)
+  const [isRecording, setIsRecording] = React.useState(false)
+  const [isProcessing, setIsProcessing] = React.useState(false)
+  const [recordingMetrics, setRecordingMetrics] = React.useState<{
+    max_amplitude?: number;
+    mean_amplitude?: number;
+    duration?: number;
+  } | null>(null)
+  const wsRef = React.useRef<WebSocket | null>(null)
   const [conversations, setConversations] = React.useState<Conversation[]>([
     {
       id: "1",
       title: "Getting Started",
-      messages: [
-        {
-          id: "1",
-          role: "user",
-          content: "Hello! How can you help me today?",
-          timestamp: new Date(Date.now() - 3600000),
-        },
-        {
-          id: "2",
-          role: "assistant",
-          content:
-            "Hello! I'm your AI assistant. I can help you with a wide variety of tasks including answering questions, writing, coding, analysis, and more. What would you like to work on?",
-          timestamp: new Date(Date.now() - 3500000),
-        },
-      ],
-      lastUpdated: new Date(Date.now() - 3500000),
+      messages: [],
+      lastUpdated: new Date(Date.now() - 3600000),
     },
     {
       id: "2",
@@ -110,7 +42,6 @@ export default function ChatPage() {
         },
       ],
       lastUpdated: new Date(Date.now() - 7200000),
-      folder: "work"
     },
     {
       id: "3",
@@ -124,7 +55,6 @@ export default function ChatPage() {
         },
       ],
       lastUpdated: new Date(Date.now() - 10800000),
-      folder: "personal"
     },
     {
       id: "4",
@@ -138,7 +68,6 @@ export default function ChatPage() {
         },
       ],
       lastUpdated: new Date(Date.now() - 14400000),
-      folder: "side-projects"
     },
     {
       id: "5",
@@ -152,42 +81,12 @@ export default function ChatPage() {
         },
       ],
       lastUpdated: new Date(Date.now() - 18000000),
-      folder: "hobbies"
     },
   ])
 
   const [activeConversationId, setActiveConversationId] = React.useState("1")
-  const [currentMessage, setCurrentMessage] = React.useState("")
-  const [isGenerating, setIsGenerating] = React.useState(false)
   const [selectedModel, setSelectedModel] = React.useState("gpt-4")
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
-  const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([])
-  const [selectedFolder, setSelectedFolder] = React.useState<string | null>(null)
-  const [showFolderDialog, setShowFolderDialog] = React.useState(false)
-  const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
-  const [showAddSpaceDialog, setShowAddSpaceDialog] = React.useState(false)
-  const [selectedSpaceForNewConversation, setSelectedSpaceForNewConversation] = React.useState<string | null>(null)
-
-  const [plugins, setPlugins] = React.useState<Plugin[]>([
-    {
-      id: "1",
-      name: "Code Assistant",
-      description: "Helps with programming and code review",
-      enabled: true,
-    },
-    {
-      id: "2",
-      name: "Document Analyzer",
-      description: "Analyzes and summarizes documents",
-      enabled: false,
-    },
-    {
-      id: "3",
-      name: "Web Search",
-      description: "Search the web for current information",
-      enabled: true,
-    },
-  ])
 
   const [availableModels] = React.useState<AIModel[]>([
     {
@@ -214,8 +113,7 @@ export default function ChatPage() {
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const isNewConversation = activeConversation?.messages.length === 0
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -224,29 +122,6 @@ export default function ChatPage() {
   React.useEffect(() => {
     scrollToBottom()
   }, [activeConversation?.messages])
-
-  // Auto-resize textarea with max height constraint
-  React.useEffect(() => {
-    const textarea = textareaRef.current
-    if (textarea) {
-      // Reset height to calculate new scroll height
-      textarea.style.height = 'auto'
-      // Set height up to max of 120px, then let it scroll
-      const newHeight = Math.min(textarea.scrollHeight, 120)
-      textarea.style.height = newHeight + 'px'
-    }
-  }, [currentMessage])
-
-  // Cleanup preview URLs on unmount
-  React.useEffect(() => {
-    return () => {
-      uploadedFiles.forEach(file => {
-        if (file.preview) {
-          URL.revokeObjectURL(file.preview)
-        }
-      })
-    }
-  }, [uploadedFiles])
 
   const handleSendMessage = async () => {
     if (!currentMessage.trim() || isGenerating) return
@@ -266,17 +141,13 @@ export default function ChatPage() {
               ...conv,
               messages: [...conv.messages, userMessage],
               lastUpdated: new Date(),
-              // Assign space to conversation if this is the first message and a space is selected
-              folder: conv.messages.length === 0 && selectedSpaceForNewConversation 
-                ? selectedSpaceForNewConversation 
-                : conv.folder
             }
           : conv,
       ),
     )
 
     setCurrentMessage("")
-    setUploadedFiles([]) // Clear uploaded files after sending
+    // setUploadedFiles([]) // This state is now in ChatInput
     setIsGenerating(true)
 
     // Simulate AI response
@@ -310,129 +181,165 @@ export default function ChatPage() {
     }
   }
 
-  const [isRecording, setIsRecording] = React.useState(false)
-
-  const handleVoiceInput = () => {
-    if (isRecording) {
-      // Stop recording
-      setIsRecording(false)
-      if (typeof window !== 'undefined' && (window as any).electron) {
-        (window as any).electron.send('stop-recording')
-      }
-    } else {
-      // Start recording
-      setIsRecording(true)
-      if (typeof window !== 'undefined' && (window as any).electron) {
-        (window as any).electron.send('start-recording')
-      }
-    }
-  }
-
   // Handle voice commands from Electron main process
   React.useEffect(() => {
-    const handleVoiceCommand = (event: any, transcription: string) => {
-      console.log('Received voice command:', transcription)
-      
+    const handleVoiceCommand = (transcription: string) => {
       // Set the transcribed text as the current message
-      setCurrentMessage(transcription)
+      if (transcription && typeof transcription === 'string') {
+        setCurrentMessage(transcription)
+      }
       
-      // Stop recording state
+      // Stop recording state and processing state
       setIsRecording(false)
+      setIsProcessing(false)
       
-      // Focus the textarea
-      textareaRef.current?.focus()
+      // Focus the textarea - This might need to be handled differently now
+      // textareaRef.current?.focus()
     }
 
-    // Listen for voice commands from Electron
-    if (typeof window !== 'undefined' && (window as any).electron) {
-      (window as any).electron.on('voice-command', handleVoiceCommand)
+    const handleRecordingError = (error: string) => {
+      toast.error(error, {
+        duration: 10000,
+      })
+      setIsRecording(false)
+      setIsProcessing(false)
+    }
+
+    const handleProcessingComplete = () => {
+      setIsProcessing(false)
+    }
+
+    // Function to set up electron listeners with retry logic
+    const setupElectronListeners = () => {
+      if (typeof window !== 'undefined') {
+        if ((window as any).electron && typeof (window as any).electron.on === 'function') {
+          try {
+            (window as any).electron.on('voice-command', handleVoiceCommand)
+            (window as any).electron.on('recording-error', handleRecordingError)
+            (window as any).electron.on('processing-complete', handleProcessingComplete)
+            return true
+          } catch (error) {
+            console.error('❌ Error setting up electron listeners:', error)
+            return false
+          }
+        } else {
+          return false
+        }
+      }
+      return false
+    }
+
+    // Try to set up listeners immediately
+    if (!setupElectronListeners()) {
+      // If it fails, retry after a short delay (preload script might still be loading)
+      const retryTimeout = setTimeout(() => {
+        if (!setupElectronListeners()) {
+          // One more retry after a longer delay
+          const finalRetryTimeout = setTimeout(() => {
+            if (!setupElectronListeners()) {
+              console.error('❌ Failed to set up electron listeners after multiple attempts')
+            }
+          }, 500)
+          
+          return () => clearTimeout(finalRetryTimeout)
+        }
+      }, 100)
+      
+      return () => clearTimeout(retryTimeout)
     }
 
     return () => {
-      if (typeof window !== 'undefined' && (window as any).electron) {
-        (window as any).electron.removeListener('voice-command', handleVoiceCommand)
+      if (typeof window !== 'undefined' && (window as any).electron && typeof (window as any).electron.removeListener === 'function') {
+        try {
+          (window as any).electron.removeListener('voice-command', handleVoiceCommand)
+          (window as any).electron.removeListener('recording-error', handleRecordingError)
+          (window as any).electron.removeListener('processing-complete', handleProcessingComplete)
+        } catch (error) {
+          console.error('❌ Error cleaning up electron listeners:', error)
+        }
       }
     }
   }, [])
 
-  const handleFileUpload = () => {
-    fileInputRef.current?.click()
-  }
-
-  const getFileType = (file: File): 'image' | 'document' | 'video' | 'audio' => {
-    const mimeType = file.type.toLowerCase()
-    if (mimeType.startsWith('image/')) return 'image'
-    if (mimeType.startsWith('video/')) return 'video'
-    if (mimeType.startsWith('audio/')) return 'audio'
-    return 'document'
-  }
-
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      const newFiles: UploadedFile[] = []
+  const handleVoiceInput = () => {
+    setRecordingMetrics(null)
+    
+    if (isRecording) {
+      // Stop recording
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send('stop')
+      }
+      setIsRecording(false)
+      setIsProcessing(true)
+    } else {
+      // Start recording
+      const ws = new WebSocket('ws://localhost:8000/ws/record')
       
-      for (const file of Array.from(files)) {
-        const fileType = getFileType(file)
-        const fileId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      ws.onopen = () => {
+        setIsRecording(true)
+      }
+      
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data)
         
-        let preview: string | undefined
-        
-        // Create preview for images
-        if (fileType === 'image') {
-          preview = URL.createObjectURL(file)
+        switch (data.status) {
+          case 'recording':
+            setIsRecording(true)
+            setIsProcessing(false)
+            break
+            
+          case 'processing':
+            setIsRecording(false)
+            setIsProcessing(true)
+            if (data.metrics) {
+              setRecordingMetrics(data.metrics)
+            }
+            break
+            
+          case 'success':
+            setIsRecording(false)
+            setIsProcessing(false)
+            if (data.transcription) {
+              setCurrentMessage(data.transcription)
+            }
+            break
+            
+          case 'error':
+            setIsRecording(false)
+            setIsProcessing(false)
+            toast.error(data.message, {
+              duration: 10000,
+            })
+            break
         }
-        
-        newFiles.push({
-          id: fileId,
-          file,
-          preview,
-          type: fileType
+      }
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+        toast.error("Connection error", {
+          duration: 5000,
         })
+        setIsRecording(false)
+        setIsProcessing(false)
       }
       
-      setUploadedFiles(prev => [...prev, ...newFiles])
-    }
-    
-    // Reset the input
-    event.target.value = ''
-  }
-
-  const removeFile = (fileId: string) => {
-    setUploadedFiles(prev => {
-      const fileToRemove = prev.find(f => f.id === fileId)
-      if (fileToRemove?.preview) {
-        URL.revokeObjectURL(fileToRemove.preview)
+      ws.onclose = () => {
+        setIsRecording(false)
+        setIsProcessing(false)
       }
-      return prev.filter(f => f.id !== fileId)
-    })
-  }
-
-  const getFileIcon = (fileType: string, fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase()
-    
-    switch (fileType) {
-      case 'image':
-        return <FileImage className="h-3 w-3" />
-      case 'video':
-        return <FileVideo className="h-3 w-3" />
-      case 'audio':
-        return <FileAudio className="h-3 w-3" />
-      case 'document':
-        if (extension === 'pdf') {
-          return <FileText className="h-3 w-3 text-red-500" />
-        }
-        if (['csv', 'xlsx', 'xls'].includes(extension || '')) {
-          return <FileText className="h-3 w-3 text-green-500" />
-        }
-        if (['doc', 'docx'].includes(extension || '')) {
-          return <FileText className="h-3 w-3 text-blue-500" />
-        }
-        return <File className="h-3 w-3" />
-      default:
-        return <File className="h-3 w-3" />
+      
+      wsRef.current = ws
     }
   }
+
+  // Cleanup WebSocket on unmount
+  React.useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+    }
+  }, [])
 
   const createNewConversation = () => {
     const newConversation: Conversation = {
@@ -443,13 +350,6 @@ export default function ChatPage() {
     }
     setConversations((prev) => [newConversation, ...prev])
     setActiveConversationId(newConversation.id)
-    setSelectedSpaceForNewConversation(null) // Reset space selection for new conversation
-  }
-
-  const togglePlugin = (pluginId: string) => {
-    setPlugins((prev) =>
-      prev.map((plugin) => (plugin.id === pluginId ? { ...plugin, enabled: !plugin.enabled } : plugin)),
-    )
   }
 
   const handleDeleteClick = () => {
@@ -474,460 +374,75 @@ export default function ChatPage() {
     }
   }
 
-  const currentModel = availableModels.find(m => m.id === selectedModel)
-
-  // Folders state - now mutable
-  const [folders, setFolders] = React.useState([
-    { id: 'personal', name: 'Personal', icon: '👤', color: 'bg-blue-100 text-blue-800' },
-    { id: 'work', name: 'Work', icon: '💼', color: 'bg-green-100 text-green-800' },
-    { id: 'side-projects', name: 'Side Projects', icon: '🚀', color: 'bg-purple-100 text-purple-800' },
-    { id: 'hobbies', name: 'Hobbies', icon: '🎨', color: 'bg-orange-100 text-orange-800' }
-  ])
-
-  // Filter conversations by selected folder
-  const filteredConversations = selectedFolder 
-    ? conversations.filter(conv => conv.folder === selectedFolder)
-    : conversations.filter(conv => !conv.folder) // Show untagged conversations when no folder selected
-
-  // Get folder info
-  const getFolderInfo = (folderId: string) => {
-    return folders.find(f => f.id === folderId)
-  }
-
-  // Add folder to conversation
-  const addFolderToConversation = (conversationId: string, folderId: string) => {
-    setConversations(prev => prev.map(conv => 
-      conv.id === conversationId 
-        ? { ...conv, folder: folderId }
-        : conv
-    ))
-  }
-
-  // Remove folder from conversation
-  const removeFolderFromConversation = (conversationId: string) => {
-    setConversations(prev => prev.map(conv => 
-      conv.id === conversationId 
-        ? { ...conv, folder: undefined }
-        : conv
-    ))
-  }
-
-  // Add new space
-  const handleAddSpace = (newSpace: { name: string; icon: string; color: string }) => {
-    const newId = `space-${Date.now()}`
-    setFolders(prev => [...prev, { ...newSpace, id: newId }])
-  }
-
   return (
-    <>
-      <SidebarProvider>
-        <AppSidebar 
-          spaces={folders.map(folder => ({
-            id: folder.id,
-            name: folder.name,
-            icon: folder.icon,
-            color: folder.color,
-            conversationCount: conversations.filter(conv => conv.folder === folder.id).length
-          }))}
-          selectedSpace={selectedFolder}
-          onSpaceSelect={setSelectedFolder}
-          onAddSpace={() => setShowAddSpaceDialog(true)}
-        />
-        <SidebarInset>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
         <div className="flex flex-col h-screen bg-background">
-          {/* Header */}
-          <header className="flex h-16 items-center gap-4 border-b px-6">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink>Chats</BreadcrumbLink>
-                </BreadcrumbItem>
-                {selectedFolder && (
-                  <>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbLink>{getFolderInfo(selectedFolder)?.name}</BreadcrumbLink>
-                    </BreadcrumbItem>
-                  </>
-                )}
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>New Conversation</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-
-            <div className="ml-auto">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                onClick={handleDeleteClick}
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Chat
-              </Button>
-            </div>
-          </header>
-
-          {/* Chat Messages */}
-          <div className="flex-1 min-h-0">
-            <ScrollArea className="h-full">
-              <div className="space-y-6 max-w-4xl mx-auto p-4 pb-6">
-                {activeConversation?.messages.map((message) => (
-                  <div key={message.id} className="space-y-3">
-                                      {message.role === "user" ? (
-                    // User Message - Card Style with hover actions
-                    <div className="flex justify-end">
-                      <div className="group max-w-[80%]">
-                        <Card className="bg-muted border-border/50">
-                          <CardContent className="p-4">
-                            <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
-                          </CardContent>
-                        </Card>
-                        
-                        {/* Action Buttons - appear on hover */}
-                        <div className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => navigator.clipboard.writeText(message.content)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Edit message')}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                      // AI Response - Free Text with Actions
-                      <div className="space-y-3">
-                        <div className="prose prose-sm max-w-none">
-                          <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-                            {message.content}
-                          </p>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Thumbs up')}
-                          >
-                            <ThumbsUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Thumbs down')}
-                          >
-                            <ThumbsDown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => navigator.clipboard.writeText(message.content)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Regenerate')}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Share')}
-                          >
-                            <Share className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {isGenerating && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Message Input - Fixed at bottom */}
-          <div className="sticky bottom-0 flex-shrink-0 p-6 bg-background/95 backdrop-blur-sm">
-            <div className="max-w-4xl mx-auto">
-              {/* Input Container */}
-              <div className="relative">
-                <Card className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200 focus-within:shadow-lg focus-within:border-ring/50 rounded-2xl overflow-hidden">
-                  <CardContent className="p-0">
-                    {/* Uploaded Files Display */}
-                    {uploadedFiles.length > 0 && (
-                      <div className="px-4 pt-3 pb-2 border-b border-border/30">
-                        <div className="flex gap-2 overflow-x-auto pb-1 pt-2 px-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
-                          {uploadedFiles.map((uploadedFile) => (
-                            <div
-                              key={uploadedFile.id}
-                              className="relative flex-shrink-0 w-12 h-12 bg-muted rounded-md border border-border/50 hover:border-border transition-colors group"
-                            >
-                              {/* Remove Button */}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="absolute -top-1 -right-1 h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                                onClick={() => removeFile(uploadedFile.id)}
-                              >
-                                <X className="h-2 w-2" />
-                              </Button>
-
-                              {/* File Content */}
-                              <div className="w-full h-full flex flex-col items-center justify-center p-1">
-                                {uploadedFile.type === 'image' && uploadedFile.preview ? (
-                                  <img
-                                    src={uploadedFile.preview}
-                                    alt={uploadedFile.file.name}
-                                    className="w-full h-full object-cover rounded-sm"
-                                  />
-                                ) : (
-                                  <div className="flex flex-col items-center justify-center text-center">
-                                    <div className="text-muted-foreground">
-                                      {getFileIcon(uploadedFile.type, uploadedFile.file.name)}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* File Name Tooltip */}
-                              <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-xs p-0.5 rounded-b-md opacity-0 group-hover:opacity-100 transition-opacity truncate text-center">
-                                {uploadedFile.file.name.length > 12 
-                                  ? `${uploadedFile.file.name.substring(0, 12)}...` 
-                                  : uploadedFile.file.name}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Space Selector */}
-                    <div className="px-4 py-2 border-b border-border/30">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Space:</span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                            >
-                              {selectedSpaceForNewConversation 
-                                ? getFolderInfo(selectedSpaceForNewConversation)?.name || 'Unknown'
-                                : 'No Space'}
-                              <ChevronDown className="ml-1 h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-48">
-                            <div className="p-2 border-b">
-                              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Select Space
-                              </div>
-                            </div>
-                            <DropdownMenuItem
-                              onClick={() => setSelectedSpaceForNewConversation(null)}
-                              className="flex items-center gap-2 p-2 cursor-pointer"
-                            >
-                              <div className="flex items-center justify-center w-4 h-4">
-                                {!selectedSpaceForNewConversation && (
-                                  <Check className="h-3 w-3 text-primary" />
-                                )}
-                              </div>
-                              <span className="text-sm">No Space</span>
-                            </DropdownMenuItem>
-                            {folders.map((folder) => (
-                              <DropdownMenuItem
-                                key={folder.id}
-                                onClick={() => setSelectedSpaceForNewConversation(folder.id)}
-                                className="flex items-center gap-2 p-2 cursor-pointer"
-                              >
-                                <div className="flex items-center justify-center w-4 h-4">
-                                  {selectedSpaceForNewConversation === folder.id && (
-                                    <Check className="h-3 w-3 text-primary" />
-                                  )}
-                                </div>
-                                <span className="mr-1">{folder.icon}</span>
-                                <span className="text-sm">{folder.name}</span>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-
-                    {/* Textarea Area */}
-                    <div className="px-4 py-2 pb-2 max-h-32">
-                      <Textarea
-                        ref={textareaRef}
-                        value={currentMessage}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCurrentMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Ask Qlippy anything..."
-                        disabled={isGenerating}
-                        rows={2}
-                        className="border-0 bg-transparent resize-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/70 px-0 py-0 min-h-[48px] max-h-28 shadow-none overflow-y-auto w-full !bg-transparent focus:bg-transparent hover:bg-transparent"
-                      />
-                    </div>
-
-                    {/* Action Bar */}
-                    <div className="flex items-center justify-between px-4 py-3">
-                      {/* Left Side - File Upload Button */}
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                          onClick={handleFileUpload}
-                        >
-                          <Paperclip className="h-3 w-3" />
-                        </Button>
-                        {/* Hidden file input */}
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          accept=".txt,.pdf,.mp4,.mp3,.wav,.avi,.mov,.csv,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.svg"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
-                      </div>
-
-                      {/* Right Side - Model Selector & Action Buttons */}
-                      <div className="flex items-center gap-2">
-                        {/* Model Selector */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                            >
-                              <span>{currentModel?.name}</span>
-                              <ChevronDown className="ml-1 h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-64">
-                            <div className="p-2 border-b">
-                              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                AI Model
-                              </div>
-                            </div>
-                            {availableModels.map((model) => (
-                              <DropdownMenuItem
-                                key={model.id}
-                                onClick={() => setSelectedModel(model.id)}
-                                className="flex items-start gap-3 p-3 cursor-pointer"
-                              >
-                                <div className="flex items-center justify-center w-4 h-4 mt-0.5">
-                                  {selectedModel === model.id && (
-                                    <Check className="h-3 w-3 text-primary" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm">{model.name}</div>
-                                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                    {model.description}
-                                  </div>
-                                </div>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        {/* Voice/Send Button */}
-                        {currentMessage.trim() ? (
-                          <Button
-                            onClick={handleSendMessage}
-                            disabled={isGenerating}
-                            size="sm"
-                            className="h-7 px-3 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
-                          >
-                            {isGenerating ? (
-                              <>
-                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                <span className="text-xs">Sending...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Send className="mr-1 h-3 w-3" />
-                                <span className="text-xs">Send</span>
-                              </>
-                            )}
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={handleVoiceInput}
-                            variant={isRecording ? "destructive" : "ghost"}
-                            size="sm"
-                            className={`h-7 px-3 rounded-lg transition-colors ${
-                              isRecording 
-                                ? "bg-red-500 hover:bg-red-600 text-white" 
-                                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                            }`}
-                          >
-                            <Mic className={`mr-1 h-3 w-3 ${isRecording ? 'animate-pulse' : ''}`} />
-                            <span className="text-xs">{isRecording ? 'Recording...' : 'Voice'}</span>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+          {isNewConversation ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full max-w-4xl px-6">
+                <ChatInput
+                  currentMessage={currentMessage}
+                  setCurrentMessage={setCurrentMessage}
+                  isGenerating={isGenerating}
+                  isRecording={isRecording}
+                  isProcessing={isProcessing}
+                  recordingMetrics={recordingMetrics}
+                  selectedModel={selectedModel}
+                  setSelectedModel={setSelectedModel}
+                  availableModels={availableModels}
+                  handleSendMessage={handleSendMessage}
+                  handleVoiceInput={handleVoiceInput}
+                  handleKeyPress={handleKeyPress}
+                  placeholder="How may I help you?"
+                />
               </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Header */}
+              <ChatHeader
+                onDelete={handleDeleteClick}
+              />
+
+              {/* Chat Messages */}
+              <MessageList
+                messages={activeConversation?.messages || []}
+                isGenerating={isGenerating}
+                messagesEndRef={messagesEndRef}
+              />
+
+              {/* Message Input - Fixed at bottom */}
+              <ChatInput
+                currentMessage={currentMessage}
+                setCurrentMessage={setCurrentMessage}
+                isGenerating={isGenerating}
+                isRecording={isRecording}
+                isProcessing={isProcessing}
+                recordingMetrics={recordingMetrics}
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+                availableModels={availableModels}
+                handleSendMessage={handleSendMessage}
+                handleVoiceInput={handleVoiceInput}
+                handleKeyPress={handleKeyPress}
+              />
+            </>
+          )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={deleteCurrentConversation}
+          title="Delete chat?"
+          description="Are you sure you want to delete this chat?"
+          confirmText="Delete"
+          cancelText="Cancel"
+        />
       </SidebarInset>
-
-      {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        onConfirm={deleteCurrentConversation}
-        title="Delete chat?"
-        description="Are you sure you want to delete this chat?"
-        confirmText="Delete"
-        cancelText="Cancel"
-      />
-
-      {/* Add Space Dialog */}
-      <AddSpaceDialog
-        open={showAddSpaceDialog}
-        onOpenChange={setShowAddSpaceDialog}
-        onAddSpace={handleAddSpace}
-      />
     </SidebarProvider>
-    </>
   )
 } 

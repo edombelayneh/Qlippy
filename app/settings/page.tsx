@@ -1,127 +1,160 @@
+"use client"
+
+import * as React from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { NavActions } from "@/components/nav-actions"
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ThemeSwitcher } from "@/components/theme-switcher"
-import { LanguageSelector } from "@/components/language-selector"
-import { NotificationSettings } from "@/components/notification-settings"
-import { PrivacySettings } from "@/components/privacy-settings"
-// import { ThemeDemo } from "@/components/theme-demo"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { 
+  Palette, 
+  Mic, 
+  Volume2, 
+  Brain, 
+  Settings2, 
+  Ear, 
+  FileText, 
+  Trash2
+} from "lucide-react"
+
+// Settings components
+import { AppearanceSettings } from "@/components/settings/appearance-settings"
+import { AudioDevicesSettings } from "@/components/settings/audio-devices-settings"
+import { TextToSpeechSettings } from "@/components/settings/text-to-speech-settings"
+import { ManageModelsSettings } from "@/components/settings/manage-models-settings"
+import { ModelBehaviorSettings } from "@/components/settings/model-behavior-settings"
+import { VoiceDetectionSettings } from "@/components/settings/voice-detection-settings"
+import { RulesSettings } from "@/components/settings/rules-settings"
+import { ClearMemorySettings } from "@/components/settings/clear-memory-settings"
+
+interface SettingsCategory {
+  id: string
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+const settingsCategories: SettingsCategory[] = [
+  {
+    id: "appearance",
+    title: "Appearance",
+    icon: Palette,
+  },
+  {
+    id: "audio-devices",
+    title: "Audio Devices",
+    icon: Mic,
+  },
+  {
+    id: "text-to-speech",
+    title: "Text-to-Speech",
+    icon: Volume2,
+  },
+  {
+    id: "manage-models",
+    title: "Manage Models",
+    icon: Brain,
+  },
+  {
+    id: "model-behavior",
+    title: "Model Behavior",
+    icon: Settings2,
+  },
+  {
+    id: "voice-detection",
+    title: "Voice Detection",
+    icon: Ear,
+  },
+  {
+    id: "rules",
+    title: "Rules",
+    icon: FileText,
+  },
+  {
+    id: "clear-memory",
+    title: "Clear Memory",
+    icon: Trash2,
+  }
+]
 
 export default function SettingsPage() {
+  const [activeCategory, setActiveCategory] = React.useState("appearance")
+
+  const renderSettingsContent = () => {
+    switch (activeCategory) {
+      case "appearance":
+        return <AppearanceSettings />
+      case "audio-devices":
+        return <AudioDevicesSettings />
+      case "text-to-speech":
+        return <TextToSpeechSettings />
+      case "manage-models":
+        return <ManageModelsSettings />
+      case "model-behavior":
+        return <ModelBehaviorSettings />
+      case "voice-detection":
+        return <VoiceDetectionSettings />
+      case "rules":
+        return <RulesSettings />
+      case "clear-memory":
+        return <ClearMemorySettings />
+      default:
+        return <AppearanceSettings />
+    }
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2">
-          <div className="flex flex-1 items-center gap-2 px-3">
-            <SidebarTrigger />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="line-clamp-1">
-                    Settings
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-          <div className="ml-auto px-3">
-            <NavActions />
-          </div>
-        </header>
-        
-        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-          <div className="flex items-center justify-between space-y-2">
-            <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
-            <Button variant="outline" size="sm">
-              Export Settings
-            </Button>
-          </div>
-          
-          <div className="grid gap-6">
-            {/* Appearance Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                   Appearance
-                  <Badge variant="secondary">Theme</Badge>
-                </CardTitle>
-                <CardDescription>
-                  Customize the look and feel of Qlippy. Choose from our beautiful theme collection.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ThemeSwitcher />
-              </CardContent>
-            </Card>
+        <div className="flex flex-col h-screen bg-background">
+          {/* Main Content */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Settings Sidebar */}
+            <div className="w-80 border-r bg-muted/20">
+              <div className="p-4">
+                <h1 className="text-xl font-semibold mb-4">Settings</h1>
+                <ScrollArea className="h-[calc(100vh-8rem)]">
+                  <div className="space-y-1">
+                    {settingsCategories.map((category) => {
+                      const Icon = category.icon
+                      const isActive = activeCategory === category.id
+                      
+                      return (
+                        <button
+                          key={category.id}
+                          onClick={() => setActiveCategory(category.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                            isActive 
+                              ? "bg-primary text-primary-foreground" 
+                              : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 flex-shrink-0" />
+                          <span className="font-medium">{category.title}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
 
-            {/* Language Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Language & Region
-                  <Badge variant="secondary">Localization</Badge>
-                </CardTitle>
-                <CardDescription>
-                  Set your preferred language and regional settings.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <LanguageSelector />
-              </CardContent>
-            </Card>
-
-            {/* Notifications Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Notifications
-                  <Badge variant="secondary">Alerts</Badge>
-                </CardTitle>
-                <CardDescription>
-                  Manage how and when you receive notifications from Qlippy.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <NotificationSettings />
-              </CardContent>
-            </Card>
-
-            {/* Privacy Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  Privacy & Security
-                  <Badge variant="secondary">Data</Badge>
-                </CardTitle>
-                <CardDescription>
-                  Control your privacy settings and data preferences.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PrivacySettings />
-              </CardContent>
-            </Card>
-
-            
+            {/* Settings Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                <div className="max-w-4xl">
+                  {renderSettingsContent()}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </SidebarInset>
