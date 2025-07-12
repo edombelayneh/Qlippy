@@ -7,7 +7,7 @@ require('dotenv').config();
 const fs = require("fs");
 const os = require("os");
 
-const accessKey = process.env.PICOVOICE_ACCESS_KEY || "YOUR_ACCESS_KEY_HERE";
+const accessKey = process.env.PORCUPINE_ACCESS_KEY || "YOUR_ACCESS_KEY_HERE";
 
 let mainWindow;
 let avatarWindow;
@@ -155,9 +155,9 @@ function createAvatarWindow() {
 function startHotwordDetection() {
   try {
     if (!accessKey || accessKey === "YOUR_ACCESS_KEY_HERE") {
-      console.error("❌ PICOVOICE_ACCESS_KEY not configured in .env file");
+      console.error("❌ PORCUPINE_ACCESS_KEY not configured in .env file");
       console.log("Please add your Picovoice access key to the .env file:");
-      console.log("PICOVOICE_ACCESS_KEY=your_actual_access_key_here");
+      console.log("PORCUPINE_ACCESS_KEY=your_actual_access_key_here");
       return;
     }
     
@@ -269,7 +269,7 @@ app.whenReady().then(async () => {
       console.log("⚠️  Hotword detection disabled - access key not configured");
       console.log("💡 To enable wake word detection:");
       console.log("   1. Get a free access key from https://console.picovoice.ai/");
-      console.log("   2. Add it to your .env file: PICOVOICE_ACCESS_KEY=your_key_here");
+      console.log("   2. Add it to your .env file: PORCUPINE_ACCESS_KEY=your_key_here");
       console.log("   3. Restart the app");
     } else {
       startHotwordDetection();

@@ -32,7 +32,7 @@ cp .env.example .env
 Edit the `.env` file and add your Picovoice access key:
 
 ```env
-PICOVOICE_ACCESS_KEY=your_actual_access_key_here
+PORCUPINE_ACCESS_KEY=your_actual_access_key_here
 ```
 
 **To get a Picovoice access key:**
