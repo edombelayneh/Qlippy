@@ -147,21 +147,38 @@ export default function ChatPage() {
 
   // Convert API conversations to frontend format
   const conversations: Conversation[] = React.useMemo(() => {
-    return apiConversations.map(apiConv => ({
-      id: apiConv.id,
-      title: apiConv.title,
-      messages: activeConversation?.id === apiConv.id 
+    console.log('Converting conversations:', {
+      apiConversationsLength: apiConversations.length,
+      activeConversationId: activeConversation?.id,
+      activeConversationMessages: activeConversation?.messages?.length || 0
+    })
+    
+    return apiConversations.map(apiConv => {
+      const messages = activeConversation?.id === apiConv.id 
         ? (activeConversation.messages || []).map(msg => ({
             id: msg.id,
             role: msg.role,
             content: msg.content,
             timestamp: new Date(msg.timestamp)
           }))
-        : [],
-      messageCount: apiConv.message_count || 0, // Use the count from API
-      lastUpdated: new Date(apiConv.last_updated),
-      folder: apiConv.folder || undefined
-    }))
+        : []
+      
+      console.log(`Conversation ${apiConv.id}:`, {
+        title: apiConv.title,
+        messageCount: messages.length,
+        activeConversationId: activeConversation?.id,
+        isActive: activeConversation?.id === apiConv.id
+      })
+      
+      return {
+        id: apiConv.id,
+        title: apiConv.title,
+        messages,
+        messageCount: apiConv.message_count || 0, // Use the count from API
+        lastUpdated: new Date(apiConv.last_updated),
+        folder: apiConv.folder || undefined
+      }
+    })
   }, [apiConversations, activeConversation])
 
   const currentConversation = conversations.find((c) => c.id === activeConversationId)
@@ -307,7 +324,12 @@ export default function ChatPage() {
 
     try {
       // Add user message to backend immediately
-      await addMessage(conversationId, "user", userMessageContent)
+      const userMessage = await addMessage(conversationId, "user", userMessageContent)
+      console.log('User message added to backend:', userMessage)
+      
+      // Force refresh the active conversation to ensure the message is visible
+      await loadConversation(conversationId)
+      console.log('Active conversation refreshed after adding user message')
       
       // Update conversation title if it's still the default title
       const currentConv = conversations.find(c => c.id === conversationId)
@@ -318,6 +340,12 @@ export default function ChatPage() {
       
       // Show immediate feedback that message was sent
       console.log('User message sent successfully:', userMessageContent)
+      console.log('Current conversation after user message:', {
+        conversationId,
+        activeConversationId,
+        currentConversationMessages: currentConversation?.messages?.length || 0,
+        activeConversationMessages: activeConversation?.messages?.length || 0
+      })
       setIsSending(false)
       setIsGenerating(true)
 
@@ -328,6 +356,8 @@ export default function ChatPage() {
         
         // Add AI response to backend
         await addMessage(conversationId, "assistant", aiResponse)
+        // Force refresh the active conversation to ensure the AI response is visible
+        await loadConversation(conversationId)
         console.log('AI response sent successfully')
         setIsGenerating(false)
       }, 1500)
