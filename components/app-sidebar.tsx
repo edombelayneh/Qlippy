@@ -23,6 +23,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 interface Space {
@@ -100,6 +101,9 @@ export function AppSidebar({
   onSelectSpaceForNewConversation,
   ...props 
 }: AppSidebarProps) {
+  const { state } = useSidebar()
+  const isExpanded = state === "expanded"
+
   // This is sample data.
   const data = {
     teams: [
@@ -134,58 +138,6 @@ export function AppSidebar({
         icon: Settings,
       },
     ],
-    favorites: [
-      {
-        name: "Project Management & Task Tracking",
-        url: "#",
-        emoji: "📊",
-      },
-      {
-        name: "Family Recipe Collection & Meal Planning",
-        url: "#",
-        emoji: "🍳",
-      },
-      {
-        name: "Fitness Tracker & Workout Routines",
-        url: "#",
-        emoji: "💪",
-      },
-      {
-        name: "Book Notes & Reading List",
-        url: "#",
-        emoji: "📚",
-      },
-      {
-        name: "Sustainable Gardening Tips & Plant Care",
-        url: "#",
-        emoji: "🌱",
-      },
-      {
-        name: "Language Learning Progress & Resources",
-        url: "#",
-        emoji: "🗣️",
-      },
-      {
-        name: "Home Renovation Ideas & Budget Tracker",
-        url: "#",
-        emoji: "🏠",
-      },
-      {
-        name: "Personal Finance & Investment Portfolio",
-        url: "#",
-        emoji: "💰",
-      },
-      {
-        name: "Movie & TV Show Watchlist with Reviews",
-        url: "#",
-        emoji: "🎬",
-      },
-      {
-        name: "Daily Habit Tracker & Goal Setting",
-        url: "#",
-        emoji: "✅",
-      },
-    ],
   }
 
   return (
@@ -206,8 +158,8 @@ export function AppSidebar({
         <NavMain items={data.navMain} />
       </SidebarHeader>
       <SidebarContent>
-        {/* Show conversations if available, otherwise show spaces */}
-        {conversations.length > 0 ? (
+        {/* Show conversations only when sidebar is expanded */}
+        {isExpanded && conversations.length > 0 ? (
           <ConversationList
             conversations={conversations}
             activeConversationId={activeConversationId || ""}
@@ -230,7 +182,7 @@ export function AppSidebar({
               console.log('Remove folder from conversation:', conversationId)
             }}
           />
-        ) : (
+        ) : isExpanded && (
           <NavSpaces 
             spaces={spaces}
             selectedSpace={selectedSpace}
@@ -238,7 +190,6 @@ export function AppSidebar({
             onAddSpace={onAddSpace}
           />
         )}
-        <NavFavorites favorites={data.favorites} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarRail />

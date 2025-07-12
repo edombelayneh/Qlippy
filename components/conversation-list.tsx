@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Folder, Plus, MoreHorizontal } from "lucide-react"
+import { Folder, MoreHorizontal } from "lucide-react"
 import { FolderSelector, FolderTag, FolderDialog } from "./folder-selector"
 
 interface Conversation {
@@ -58,23 +58,11 @@ export function ConversationList({
   }
 
   return (
-    <div className="space-y-4">
-      {/* New Conversation Button */}
-      <Button 
-        onClick={onNewConversation}
-        className="w-full justify-start"
-        variant="outline"
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        New Conversation
-      </Button>
-
-      {/* Folder Selector - Removed since it's now in the sidebar */}
-
+    <div className="space-y-4 px-3">
       {/* Conversations */}
       <div className="space-y-2">
         <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          {selectedFolder ? getFolderInfo(selectedFolder)?.name : 'Recent Conversations'}
+          {selectedFolder ? getFolderInfo(selectedFolder)?.name : 'Chats'}
         </div>
         
         <div className="space-y-1">
