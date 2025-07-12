@@ -4,6 +4,8 @@ import * as React from "react"
 import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, MoreHorizontal, Edit, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { ConversationList } from "@/components/conversation-list"
+import { AddSpaceDialog } from "@/components/add-space-dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardContent } from "@/components/ui/card"
@@ -40,6 +42,7 @@ interface Conversation {
   title: string
   messages: Message[]
   lastUpdated: Date
+  folder?: string // Optional folder tag
 }
 
 interface Plugin {
@@ -63,6 +66,17 @@ interface UploadedFile {
 }
 
 export default function ChatPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    // Simulate app initialization
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 2000) // Show loader for 2 seconds
+
+    return () => clearTimeout(timer)
+  }, [])
+
   const [conversations, setConversations] = React.useState<Conversation[]>([
     {
       id: "1",
@@ -84,6 +98,62 @@ export default function ChatPage() {
       ],
       lastUpdated: new Date(Date.now() - 3500000),
     },
+    {
+      id: "2",
+      title: "Work Project Planning",
+      messages: [
+        {
+          id: "3",
+          role: "user",
+          content: "Help me plan a new project for work",
+          timestamp: new Date(Date.now() - 7200000),
+        },
+      ],
+      lastUpdated: new Date(Date.now() - 7200000),
+      folder: "work"
+    },
+    {
+      id: "3",
+      title: "Personal Finance Tips",
+      messages: [
+        {
+          id: "4",
+          role: "user",
+          content: "What are some good personal finance tips?",
+          timestamp: new Date(Date.now() - 10800000),
+        },
+      ],
+      lastUpdated: new Date(Date.now() - 10800000),
+      folder: "personal"
+    },
+    {
+      id: "4",
+      title: "Side Project Ideas",
+      messages: [
+        {
+          id: "5",
+          role: "user",
+          content: "I want to start a side project, any ideas?",
+          timestamp: new Date(Date.now() - 14400000),
+        },
+      ],
+      lastUpdated: new Date(Date.now() - 14400000),
+      folder: "side-projects"
+    },
+    {
+      id: "5",
+      title: "Photography Tips",
+      messages: [
+        {
+          id: "6",
+          role: "user",
+          content: "How can I improve my photography skills?",
+          timestamp: new Date(Date.now() - 18000000),
+        },
+      ],
+      lastUpdated: new Date(Date.now() - 18000000),
+      folder: "hobbies"
+    },
   ])
 
   const [activeConversationId, setActiveConversationId] = React.useState("1")
@@ -92,6 +162,10 @@ export default function ChatPage() {
   const [selectedModel, setSelectedModel] = React.useState("gpt-4")
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([])
+  const [selectedFolder, setSelectedFolder] = React.useState<string | null>(null)
+  const [showFolderDialog, setShowFolderDialog] = React.useState(false)
+  const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
+  const [showAddSpaceDialog, setShowAddSpaceDialog] = React.useState(false)
 
   const [plugins, setPlugins] = React.useState<Plugin[]>([
     {
@@ -357,10 +431,64 @@ export default function ChatPage() {
 
   const currentModel = availableModels.find(m => m.id === selectedModel)
 
+  // Folders state - now mutable
+  const [folders, setFolders] = React.useState([
+    { id: 'personal', name: 'Personal', icon: '👤', color: 'bg-blue-100 text-blue-800' },
+    { id: 'work', name: 'Work', icon: '💼', color: 'bg-green-100 text-green-800' },
+    { id: 'side-projects', name: 'Side Projects', icon: '🚀', color: 'bg-purple-100 text-purple-800' },
+    { id: 'hobbies', name: 'Hobbies', icon: '🎨', color: 'bg-orange-100 text-orange-800' }
+  ])
+
+  // Filter conversations by selected folder
+  const filteredConversations = selectedFolder 
+    ? conversations.filter(conv => conv.folder === selectedFolder)
+    : conversations.filter(conv => !conv.folder) // Show untagged conversations when no folder selected
+
+  // Get folder info
+  const getFolderInfo = (folderId: string) => {
+    return folders.find(f => f.id === folderId)
+  }
+
+  // Add folder to conversation
+  const addFolderToConversation = (conversationId: string, folderId: string) => {
+    setConversations(prev => prev.map(conv => 
+      conv.id === conversationId 
+        ? { ...conv, folder: folderId }
+        : conv
+    ))
+  }
+
+  // Remove folder from conversation
+  const removeFolderFromConversation = (conversationId: string) => {
+    setConversations(prev => prev.map(conv => 
+      conv.id === conversationId 
+        ? { ...conv, folder: undefined }
+        : conv
+    ))
+  }
+
+  // Add new space
+  const handleAddSpace = (newSpace: { name: string; icon: string; color: string }) => {
+    const newId = `space-${Date.now()}`
+    setFolders(prev => [...prev, { ...newSpace, id: newId }])
+  }
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
+    <>
+      <SidebarProvider>
+        <AppSidebar 
+          spaces={folders.map(folder => ({
+            id: folder.id,
+            name: folder.name,
+            icon: folder.icon,
+            color: folder.color,
+            conversationCount: conversations.filter(conv => conv.folder === folder.id).length
+          }))}
+          selectedSpace={selectedFolder}
+          onSpaceSelect={setSelectedFolder}
+          onAddSpace={() => setShowAddSpaceDialog(true)}
+        />
+        <SidebarInset>
         <div className="flex flex-col h-screen bg-background">
           {/* Header */}
           <header className="flex h-16 items-center gap-4 border-b px-6">
@@ -369,6 +497,14 @@ export default function ChatPage() {
                 <BreadcrumbItem>
                   <BreadcrumbLink>Chats</BreadcrumbLink>
                 </BreadcrumbItem>
+                {selectedFolder && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbLink>{getFolderInfo(selectedFolder)?.name}</BreadcrumbLink>
+                    </BreadcrumbItem>
+                  </>
+                )}
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                   <BreadcrumbPage>New Conversation</BreadcrumbPage>
@@ -681,6 +817,14 @@ export default function ChatPage() {
         confirmText="Delete"
         cancelText="Cancel"
       />
+
+      {/* Add Space Dialog */}
+      <AddSpaceDialog
+        open={showAddSpaceDialog}
+        onOpenChange={setShowAddSpaceDialog}
+        onAddSpace={handleAddSpace}
+      />
     </SidebarProvider>
+    </>
   )
 } 
