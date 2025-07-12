@@ -88,14 +88,18 @@ def update_conversation(conversation_id):
         return jsonify({'error': 'Conversation not found'}), 404
     
     data = request.get_json()
+    print(f"Updating conversation {conversation_id} with data: {data}")
+    
     if 'title' in data:
         conversation.title = data['title']
     if 'folder' in data:
+        print(f"Setting folder to: {data['folder']} (type: {type(data['folder'])})")
         conversation.folder = data['folder']
     
     conversation.last_updated = datetime.utcnow()
     db.session.commit()
     
+    print(f"Conversation updated. New folder value: {conversation.folder}")
     return jsonify(conversation.to_dict())
 
 @api.route('/conversations/<conversation_id>', methods=['DELETE'])

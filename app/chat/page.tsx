@@ -62,6 +62,14 @@ interface AIModel {
   description: string
 }
 
+interface Space {
+  id: string
+  name: string
+  icon: string
+  color: string
+  conversationCount?: number
+}
+
 interface UploadedFile {
   id: string
   file: File
@@ -99,6 +107,13 @@ export default function ChatPage() {
   const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
   const [showAddSpaceDialog, setShowAddSpaceDialog] = React.useState(false)
   const [selectedSpaceForNewConversation, setSelectedSpaceForNewConversation] = React.useState<string | null>(null)
+  const [spaces, setSpaces] = React.useState<Space[]>([
+    { id: "work", name: "Work", icon: "💼", color: "blue", conversationCount: 0 },
+    { id: "personal", name: "Personal", icon: "👤", color: "green", conversationCount: 0 },
+    { id: "side-projects", name: "Side Projects", icon: "🚀", color: "purple", conversationCount: 0 },
+    { id: "hobbies", name: "Hobbies", icon: "🎨", color: "orange", conversationCount: 0 },
+  ])
+  const [selectedSpace, setSelectedSpace] = React.useState<string | null>(null)
   const hasSetInitialConversation = React.useRef(false)
 
   const [plugins, setPlugins] = React.useState<Plugin[]>([
@@ -145,15 +160,35 @@ export default function ChatPage() {
     }
   ])
 
-  // Convert API conversations to frontend format
+  // Convert API conversations to frontend format and filter by selected space
   const conversations: Conversation[] = React.useMemo(() => {
     console.log('Converting conversations:', {
       apiConversationsLength: apiConversations.length,
       activeConversationId: activeConversation?.id,
-      activeConversationMessages: activeConversation?.messages?.length || 0
+      activeConversationMessages: activeConversation?.messages?.length || 0,
+      selectedSpace
     })
     
-    return apiConversations.map(apiConv => {
+    let filteredConversations = apiConversations
+    
+    // Filter conversations by selected space
+    if (selectedSpace) {
+      filteredConversations = apiConversations.filter(conv => conv.folder === selectedSpace)
+    } else {
+      // When no space is selected, show conversations that don't have a folder assigned
+      filteredConversations = apiConversations.filter(conv => !conv.folder || conv.folder === "")
+    }
+    
+    console.log('Filtering conversations:', {
+      selectedSpace,
+      totalConversations: apiConversations.length,
+      filteredCount: filteredConversations.length,
+      conversationsWithFolders: apiConversations.filter(conv => conv.folder).length,
+      conversationsWithoutFolders: apiConversations.filter(conv => !conv.folder).length,
+      folderValues: apiConversations.map(conv => ({ id: conv.id, folder: conv.folder }))
+    })
+    
+    return filteredConversations.map(apiConv => {
       const messages = activeConversation?.id === apiConv.id 
         ? (activeConversation.messages || []).map(msg => ({
             id: msg.id,
@@ -167,7 +202,8 @@ export default function ChatPage() {
         title: apiConv.title,
         messageCount: messages.length,
         activeConversationId: activeConversation?.id,
-        isActive: activeConversation?.id === apiConv.id
+        isActive: activeConversation?.id === apiConv.id,
+        folder: apiConv.folder
       })
       
       return {
@@ -179,7 +215,16 @@ export default function ChatPage() {
         folder: apiConv.folder || undefined
       }
     })
-  }, [apiConversations, activeConversation])
+  }, [apiConversations, activeConversation, selectedSpace])
+
+  // Update space conversation counts
+  React.useEffect(() => {
+    const updatedSpaces = spaces.map(space => {
+      const count = apiConversations.filter(conv => conv.folder === space.id).length
+      return { ...space, conversationCount: count }
+    })
+    setSpaces(updatedSpaces)
+  }, [apiConversations])
 
   const currentConversation = conversations.find((c) => c.id === activeConversationId)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
@@ -514,35 +559,29 @@ export default function ChatPage() {
     )
   }
 
-  const handleDeleteClick = () => {
-    setShowDeleteDialog(true)
-  }
-
-  const deleteCurrentConversation = async () => {
-    if (!activeConversationId) return
-
+  const handleDeleteConversation = async (conversationId: string) => {
     try {
-      await deleteConversation(activeConversationId)
-      setActiveConversationId(null)
-      setShowDeleteDialog(false)
+      await deleteConversation(conversationId)
+      // If we're deleting the currently active conversation, clear it
+      if (activeConversationId === conversationId) {
+        setActiveConversationId(null)
+      }
     } catch (error) {
       console.error('Failed to delete conversation:', error)
     }
   }
 
   const getFolderInfo = (folderId: string) => {
-    const folders = [
-      { id: "work", name: "Work", icon: "💼", color: "blue" },
-      { id: "personal", name: "Personal", icon: "👤", color: "green" },
-      { id: "side-projects", name: "Side Projects", icon: "🚀", color: "purple" },
-      { id: "hobbies", name: "Hobbies", icon: "🎨", color: "orange" },
-    ]
-    return folders.find(f => f.id === folderId)
+    return spaces.find(space => space.id === folderId)
   }
 
   const addFolderToConversation = async (conversationId: string, folderId: string) => {
     try {
       await updateConversation(conversationId, { folder: folderId })
+      // Reload conversations to update the UI
+      if (user) {
+        await loadConversations(user.id)
+      }
     } catch (error) {
       console.error('Failed to add folder to conversation:', error)
     }
@@ -550,15 +589,29 @@ export default function ChatPage() {
 
   const removeFolderFromConversation = async (conversationId: string) => {
     try {
-      await updateConversation(conversationId, { folder: undefined })
+      console.log('Removing folder from conversation:', conversationId)
+      await updateConversation(conversationId, { folder: "" })
+      console.log('Successfully removed folder from conversation')
+      // Reload conversations to update the UI
+      if (user) {
+        console.log('Reloading conversations for user:', user.id)
+        await loadConversations(user.id)
+        console.log('Conversations reloaded')
+      }
     } catch (error) {
       console.error('Failed to remove folder from conversation:', error)
     }
   }
 
   const handleAddSpace = (newSpace: { name: string; icon: string; color: string }) => {
-    // This would integrate with the backend space/folder system
-    console.log('Adding new space:', newSpace)
+    const newSpaceWithId: Space = {
+      id: `space-${Date.now()}`, // Generate a unique ID
+      name: newSpace.name,
+      icon: newSpace.icon,
+      color: newSpace.color,
+      conversationCount: 0
+    }
+    setSpaces(prev => [...prev, newSpaceWithId])
     setShowAddSpaceDialog(false)
   }
 
@@ -593,6 +646,10 @@ export default function ChatPage() {
     <SidebarProvider>
       <div className="flex h-screen w-full">
         <AppSidebar
+          spaces={spaces}
+          selectedSpace={selectedSpace}
+          onSpaceSelect={setSelectedSpace}
+          onAddSpace={() => setShowAddSpaceDialog(true)}
           conversations={conversations}
           activeConversationId={activeConversationId}
           onConversationSelect={(id) => {
@@ -600,13 +657,14 @@ export default function ChatPage() {
             loadConversation(id)
           }}
           onCreateConversation={createNewConversation}
-          onDeleteConversation={handleDeleteClick}
+          onDeleteConversation={handleDeleteConversation}
+          onAddFolder={addFolderToConversation}
+          onRemoveFolder={removeFolderFromConversation}
           plugins={plugins}
           onTogglePlugin={togglePlugin}
           availableModels={availableModels}
           selectedModel={selectedModel}
           onModelSelect={setSelectedModel}
-          onAddSpace={() => setShowAddSpaceDialog(true)}
           selectedSpaceForNewConversation={selectedSpaceForNewConversation}
           onSelectSpaceForNewConversation={setSelectedSpaceForNewConversation}
         />
@@ -845,7 +903,12 @@ export default function ChatPage() {
         onOpenChange={setShowDeleteDialog}
         title="Delete Conversation"
         description="Are you sure you want to delete this conversation? This action cannot be undone."
-        onConfirm={deleteCurrentConversation}
+        onConfirm={() => {
+          if (activeConversationId) {
+            handleDeleteConversation(activeConversationId)
+            setShowDeleteDialog(false)
+          }
+        }}
       />
 
       <AddSpaceDialog

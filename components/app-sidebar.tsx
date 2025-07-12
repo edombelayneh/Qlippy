@@ -68,7 +68,9 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   activeConversationId?: string | null
   onConversationSelect?: (id: string) => void
   onCreateConversation?: () => void
-  onDeleteConversation?: () => void
+  onDeleteConversation?: (conversationId: string) => void
+  onAddFolder?: (conversationId: string, folderId: string) => void
+  onRemoveFolder?: (conversationId: string) => void
   
   // Plugin and model management
   plugins?: Plugin[]
@@ -92,6 +94,8 @@ export function AppSidebar({
   onConversationSelect,
   onCreateConversation,
   onDeleteConversation,
+  onAddFolder,
+  onRemoveFolder,
   plugins = [],
   onTogglePlugin,
   availableModels = [],
@@ -158,8 +162,18 @@ export function AppSidebar({
         <NavMain items={data.navMain} />
       </SidebarHeader>
       <SidebarContent>
-        {/* Show conversations only when sidebar is expanded */}
-        {isExpanded && conversations.length > 0 ? (
+        {/* Show spaces when sidebar is expanded */}
+        {isExpanded && (
+          <NavSpaces 
+            spaces={spaces}
+            selectedSpace={selectedSpace}
+            onSpaceSelect={onSpaceSelect || (() => {})}
+            onAddSpace={onAddSpace}
+          />
+        )}
+        
+        {/* Show conversations when sidebar is expanded and there are conversations */}
+        {isExpanded && conversations.length > 0 && (
           <ConversationList
             conversations={conversations}
             activeConversationId={activeConversationId || ""}
@@ -173,21 +187,9 @@ export function AppSidebar({
             }))}
             selectedFolder={selectedSpace}
             onFolderSelect={onSpaceSelect || (() => {})}
-            onAddFolder={(conversationId, folderId) => {
-              // This would need to be implemented
-              console.log('Add folder to conversation:', conversationId, folderId)
-            }}
-            onRemoveFolder={(conversationId) => {
-              // This would need to be implemented
-              console.log('Remove folder from conversation:', conversationId)
-            }}
-          />
-        ) : isExpanded && (
-          <NavSpaces 
-            spaces={spaces}
-            selectedSpace={selectedSpace}
-            onSpaceSelect={onSpaceSelect || (() => {})}
-            onAddSpace={onAddSpace}
+            onAddFolder={onAddFolder || (() => {})}
+            onRemoveFolder={onRemoveFolder || (() => {})}
+            onDeleteConversation={onDeleteConversation}
           />
         )}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
