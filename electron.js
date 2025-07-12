@@ -12,7 +12,12 @@ const outputPath = path.join(app.getPath('temp'), 'recording.wav');
 async function listAudioDevices() {
   return new Promise((resolve, reject) => {
     console.log('Listing available audio devices...');
-    const ffmpeg = spawn('ffmpeg', ['-f', 'avfoundation', '-list_devices', 'true', '-i', '']);
+    const isWindows = process.platform === 'win32';
+    const args = isWindows 
+      ? ['-list_devices', 'true', '-f', 'dshow', '-i', 'dummy']
+      : ['-f', 'avfoundation', '-list_devices', 'true', '-i', ''];
+      
+    const ffmpeg = spawn('ffmpeg', args);
     
     let devices = '';
     ffmpeg.stderr.on('data', (data) => {
@@ -30,6 +35,41 @@ async function listAudioDevices() {
       reject(err);
     });
   });
+}
+
+// Function to parse audio devices from ffmpeg output
+function parseAudioDevices(data, platform) {
+  const lines = data.split('\n');
+  const devices = [];
+  if (platform === 'win32') {
+    const regex = /"([^"]+)"/g;
+    for (const line of lines) {
+      // This is to skip the line that says "DirectShow audio devices"
+      if (line.includes('DirectShow audio devices')) continue;
+
+      // Find all quoted strings in the line
+      let match;
+      while ((match = regex.exec(line)) !== null) {
+        devices.push(match[1]);
+      }
+    }
+  } else { // darwin
+    const regex = /\[(\d+)\]\s(.+)/;
+    let inAudio = false;
+    for (const line of lines) {
+      if (line.includes('AVFoundation audio devices:')) {
+        inAudio = true;
+        continue;
+      }
+      if (inAudio) {
+        const match = line.match(regex);
+        if (match) {
+          devices.push({ index: match[1], name: match[2].trim() });
+        }
+      }
+    }
+  }
+  return devices;
 }
 
 // Handle recording start
@@ -50,23 +90,59 @@ ipcMain.on('start-recording', async () => {
   }
 
   // Get the list of devices first
+  let audioDevice = '';
+  const isWindows = process.platform === 'win32';
   try {
-    await listAudioDevices();
+    const deviceListStr = await listAudioDevices();
+    const devices = parseAudioDevices(deviceListStr, process.platform);
+    
+    if (devices.length > 0) {
+      if (isWindows) {
+        const mic = devices.find(d => d.toLowerCase().includes('microphone'));
+        audioDevice = mic || devices[0];
+      } else { // darwin
+        const mic = devices.find(d => d.name.toLowerCase().includes('microphone'));
+        audioDevice = mic ? mic.index : devices[0].index;
+      }
+      console.log(`Using audio device: ${audioDevice}`);
+    } else {
+      console.error('No audio devices found.');
+    }
   } catch (error) {
-    console.error('Failed to list devices:', error);
+    console.error('Failed to list or parse devices:', error);
+  }
+
+  if (!audioDevice) {
+    mainWindow.webContents.send('recording-error', 'No audio devices found.');
+    isRecording = false;
+    return;
   }
   
-  ffmpegProcess = spawn('ffmpeg', [
-    '-f', 'avfoundation',    // Use avfoundation for macOS
-    '-i', 'none:1',          // Format is "video_device:audio_device" - 'none' skips video device
-    '-acodec', 'pcm_s16le',  // 16-bit PCM
-    '-ar', '16000',          // 16kHz sample rate
-    '-ac', '1',              // Mono audio
-    '-af', 'volume=2.0',     // Increase volume
-    '-y',                    // Overwrite output file
-    '-v', 'debug',           // Verbose output for debugging
-    outputPath
-  ]);
+  const ffmpegArgs = isWindows
+    ? [
+        '-f', 'dshow',
+        '-i', `audio=${audioDevice}`,
+        '-acodec', 'pcm_s16le',
+        '-ar', '16000',
+        '-ac', '1',
+        '-af', 'volume=2.0',
+        '-y',
+        '-v', 'debug',
+        outputPath
+      ]
+    : [
+        '-f', 'avfoundation',
+        '-i', `none:${audioDevice}`, // On macOS, we can use device index
+        '-acodec', 'pcm_s16le',
+        '-ar', '16000',
+        '-ac', '1',
+        '-af', 'volume=2.0',
+        '-y',
+        '-v', 'debug',
+        outputPath
+      ];
+
+  ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
   ffmpegProcess.stderr.on('data', (data) => {
     console.log(`ffmpeg: ${data}`);

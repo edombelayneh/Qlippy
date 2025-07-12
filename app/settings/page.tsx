@@ -35,6 +35,7 @@ import { ModelBehaviorSettings } from "@/components/settings/model-behavior-sett
 import { VoiceDetectionSettings } from "@/components/settings/voice-detection-settings"
 import { RulesSettings } from "@/components/settings/rules-settings"
 import { ClearMemorySettings } from "@/components/settings/clear-memory-settings"
+import { CurrentSettings } from "@/components/settings/current-settings"
 
 interface SettingsCategory {
   id: string
@@ -167,7 +168,8 @@ export default function SettingsPage() {
             {/* Settings Content */}
             <div className="flex-1 overflow-y-auto">
               <div className="p-6">
-                <div className="max-w-4xl">
+                <div className="max-w-4xl space-y-6">
+                  <CurrentSettings />
                   {renderSettingsContent()}
                 </div>
               </div>

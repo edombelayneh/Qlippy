@@ -155,7 +155,65 @@ export default function ChatPage() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I understand you said: "${userMessage.content}". This is a simulated response using ${availableModels.find(m => m.id === selectedModel)?.name}. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`,
+        content: `
+# Markdown Formatting Test
+
+This is a test to showcase the various markdown formatting options available.
+
+## Text Formatting
+
+*This text is italicized.*
+**This text is bold.**
+***This text is both bold and italicized.***
+~This text is strikethrough.~
+
+## Lists
+
+### Unordered List
+- Item 1
+- Item 2
+  - Sub-item 2.1
+  - Sub-item 2.2
+- Item 3
+
+### Ordered List
+1. First item
+2. Second item
+3. Third item
+
+## Code Blocks
+
+### Inline Code
+This is an example of \`inline code\`.
+
+### Code Block
+\`\`\`javascript
+function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+console.log(greet('World'));
+\`\`\`
+
+## Blockquote
+> "The only true wisdom is in knowing you know nothing."
+> - Socrates
+
+## Table
+| Header 1 | Header 2 | Header 3 |
+| :--- | :---: | ---: |
+| Align Left | Align Center | Align Right |
+| Cell 1 | Cell 2 | Cell 3 |
+| Cell 4 | Cell 5 | Cell 6 |
+
+## LaTeX Mathematical Expressions
+The quadratic formula is given by: $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$
+
+And here is a block-level LaTeX expression:
+
+$$
+\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}
+$$
+`,
         timestamp: new Date(),
       }
 

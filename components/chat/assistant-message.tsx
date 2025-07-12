@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { ThumbsUp, ThumbsDown, Copy, RotateCcw, Share } from "lucide-react"
+import { MarkdownRenderer } from "@/components/markdown-renderer"
 
 interface AssistantMessageProps {
   content: string
@@ -11,11 +12,7 @@ interface AssistantMessageProps {
 export function AssistantMessage({ content }: AssistantMessageProps) {
   return (
     <div className="space-y-3">
-      <div className="prose prose-sm max-w-none">
-        <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-          {content}
-        </p>
-      </div>
+      <MarkdownRenderer content={content} />
       
       {/* Action Buttons */}
       <div className="flex items-center gap-1">
