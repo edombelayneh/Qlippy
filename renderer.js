@@ -25,7 +25,7 @@ clippy.addEventListener('click', () => {
 ipcRenderer.on('wake-word-detected', () => {
   console.log('Wake word detected');
   clippy.classList.add('active');
-  statusText.textContent = 'Hey! How can I help?';
+  // No text content - avatar only
   statusText.classList.add('visible');
   
   // Play activation sound
@@ -60,7 +60,7 @@ ipcRenderer.on('speaking-error', (event, error) => {
   console.error('Speaking error:', error);
   clippy.classList.remove('speaking');
   clippy.classList.add('error');
-  statusText.textContent = 'Sorry, I had trouble speaking.';
+  // No text content - avatar only
   
   setTimeout(() => {
     clippy.classList.remove('error');
@@ -73,24 +73,24 @@ ipcRenderer.on('recording-started', () => {
   console.log('Recording started');
   clippy.classList.remove('active', 'speaking');
   clippy.classList.add('recording');
-  statusText.textContent = 'Listening...';
+  // No text content - avatar only
   statusText.classList.add('visible');
 });
 
 ipcRenderer.on('recording-stopped', () => {
   console.log('Recording stopped');
   clippy.classList.remove('recording');
-  statusText.textContent = 'Processing...';
+  // No text content - avatar only
 });
 
 ipcRenderer.on('processing-complete', () => {
   console.log('Processing complete');
-  statusText.textContent = 'Done!';
+  // No text content - avatar only
 });
 
 ipcRenderer.on('recording-error', (event, error) => {
   console.error('Recording error:', error);
-  statusText.textContent = 'Oops! Try again.';
+  // No text content - avatar only
   clippy.classList.add('error');
   clippy.classList.remove('recording', 'speaking');
   
