@@ -166,6 +166,7 @@ export default function ChatPage() {
   const [showFolderDialog, setShowFolderDialog] = React.useState(false)
   const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
   const [showAddSpaceDialog, setShowAddSpaceDialog] = React.useState(false)
+  const [selectedSpaceForNewConversation, setSelectedSpaceForNewConversation] = React.useState<string | null>(null)
 
   const [plugins, setPlugins] = React.useState<Plugin[]>([
     {
@@ -265,6 +266,10 @@ export default function ChatPage() {
               ...conv,
               messages: [...conv.messages, userMessage],
               lastUpdated: new Date(),
+              // Assign space to conversation if this is the first message and a space is selected
+              folder: conv.messages.length === 0 && selectedSpaceForNewConversation 
+                ? selectedSpaceForNewConversation 
+                : conv.folder
             }
           : conv,
       ),
@@ -305,11 +310,50 @@ export default function ChatPage() {
     }
   }
 
+  const [isRecording, setIsRecording] = React.useState(false)
+
   const handleVoiceInput = () => {
-    // Voice input functionality would go here
-    console.log("Voice input activated")
-    textareaRef.current?.focus()
+    if (isRecording) {
+      // Stop recording
+      setIsRecording(false)
+      if (typeof window !== 'undefined' && (window as any).electron) {
+        (window as any).electron.send('stop-recording')
+      }
+    } else {
+      // Start recording
+      setIsRecording(true)
+      if (typeof window !== 'undefined' && (window as any).electron) {
+        (window as any).electron.send('start-recording')
+      }
+    }
   }
+
+  // Handle voice commands from Electron main process
+  React.useEffect(() => {
+    const handleVoiceCommand = (event: any, transcription: string) => {
+      console.log('Received voice command:', transcription)
+      
+      // Set the transcribed text as the current message
+      setCurrentMessage(transcription)
+      
+      // Stop recording state
+      setIsRecording(false)
+      
+      // Focus the textarea
+      textareaRef.current?.focus()
+    }
+
+    // Listen for voice commands from Electron
+    if (typeof window !== 'undefined' && (window as any).electron) {
+      (window as any).electron.on('voice-command', handleVoiceCommand)
+    }
+
+    return () => {
+      if (typeof window !== 'undefined' && (window as any).electron) {
+        (window as any).electron.removeListener('voice-command', handleVoiceCommand)
+      }
+    }
+  }, [])
 
   const handleFileUpload = () => {
     fileInputRef.current?.click()
@@ -399,6 +443,7 @@ export default function ChatPage() {
     }
     setConversations((prev) => [newConversation, ...prev])
     setActiveConversationId(newConversation.id)
+    setSelectedSpaceForNewConversation(null) // Reset space selection for new conversation
   }
 
   const togglePlugin = (pluginId: string) => {
@@ -687,6 +732,60 @@ export default function ChatPage() {
                       </div>
                     )}
 
+                    {/* Space Selector */}
+                    <div className="px-4 py-2 border-b border-border/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Space:</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                            >
+                              {selectedSpaceForNewConversation 
+                                ? getFolderInfo(selectedSpaceForNewConversation)?.name || 'Unknown'
+                                : 'No Space'}
+                              <ChevronDown className="ml-1 h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-48">
+                            <div className="p-2 border-b">
+                              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Select Space
+                              </div>
+                            </div>
+                            <DropdownMenuItem
+                              onClick={() => setSelectedSpaceForNewConversation(null)}
+                              className="flex items-center gap-2 p-2 cursor-pointer"
+                            >
+                              <div className="flex items-center justify-center w-4 h-4">
+                                {!selectedSpaceForNewConversation && (
+                                  <Check className="h-3 w-3 text-primary" />
+                                )}
+                              </div>
+                              <span className="text-sm">No Space</span>
+                            </DropdownMenuItem>
+                            {folders.map((folder) => (
+                              <DropdownMenuItem
+                                key={folder.id}
+                                onClick={() => setSelectedSpaceForNewConversation(folder.id)}
+                                className="flex items-center gap-2 p-2 cursor-pointer"
+                              >
+                                <div className="flex items-center justify-center w-4 h-4">
+                                  {selectedSpaceForNewConversation === folder.id && (
+                                    <Check className="h-3 w-3 text-primary" />
+                                  )}
+                                </div>
+                                <span className="mr-1">{folder.icon}</span>
+                                <span className="text-sm">{folder.name}</span>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+
                     {/* Textarea Area */}
                     <div className="px-4 py-2 pb-2 max-h-32">
                       <Textarea
@@ -789,12 +888,16 @@ export default function ChatPage() {
                         ) : (
                           <Button
                             onClick={handleVoiceInput}
-                            variant="ghost"
+                            variant={isRecording ? "destructive" : "ghost"}
                             size="sm"
-                            className="h-7 px-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                            className={`h-7 px-3 rounded-lg transition-colors ${
+                              isRecording 
+                                ? "bg-red-500 hover:bg-red-600 text-white" 
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                            }`}
                           >
-                            <Mic className="mr-1 h-3 w-3" />
-                            <span className="text-xs">Voice</span>
+                            <Mic className={`mr-1 h-3 w-3 ${isRecording ? 'animate-pulse' : ''}`} />
+                            <span className="text-xs">{isRecording ? 'Recording...' : 'Voice'}</span>
                           </Button>
                         )}
                       </div>
