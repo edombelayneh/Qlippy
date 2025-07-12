@@ -12,7 +12,6 @@ import { toast } from "sonner"
 interface Rule {
   id: string
   description: string
-  dateAdded: string
 }
 
 export function RulesSettings() {
@@ -20,17 +19,14 @@ export function RulesSettings() {
     {
       id: "1",
       description: "Always check for proper error handling, type safety, and documentation when reviewing code",
-      dateAdded: "2024-01-15"
     },
     {
       id: "2",
       description: "Use clear headings, bullet points, and code blocks for technical content in responses",
-      dateAdded: "2024-01-12"
     },
     {
       id: "3",
       description: "Break down complex tasks into smaller, manageable steps with clear dependencies",
-      dateAdded: "2024-01-10"
     }
   ])
 
@@ -62,7 +58,6 @@ export function RulesSettings() {
     const rule: Rule = {
       id: Date.now().toString(),
       description: newRuleDescription.trim(),
-      dateAdded: new Date().toISOString().split('T')[0]
     }
 
     setRules(prev => [...prev, rule])
@@ -139,9 +134,6 @@ export function RulesSettings() {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-muted-foreground">
                       {rule.description}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Added {new Date(rule.dateAdded).toLocaleDateString()}
                     </div>
                   </div>
                 </div>

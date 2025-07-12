@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Send, Mic, ChevronDown, Check, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File } from "lucide-react"
+import { Loader2, Send, Mic, ChevronDown, Check, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -10,8 +10,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { AIModel, UploadedFile } from "@/lib/types"
+import { useRouter } from "next/navigation"
 
 interface ChatInputProps {
   currentMessage: string
@@ -47,6 +49,7 @@ export function ChatInput({
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([])
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const router = useRouter()
 
   // Auto-resize textarea with max height constraint
   React.useEffect(() => {
@@ -244,7 +247,7 @@ export function ChatInput({
                           AI Model
                         </div>
                       </div>
-                      {availableModels.map((model) => (
+                      {availableModels.slice(0, 3).map((model) => (
                         <DropdownMenuItem
                           key={model.id}
                           onClick={() => setSelectedModel(model.id)}
@@ -263,6 +266,14 @@ export function ChatInput({
                           </div>
                         </DropdownMenuItem>
                       ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => router.push('/settings?category=manage-models')}
+                        className="flex items-center gap-3 p-3 cursor-pointer text-primary hover:bg-primary/10"
+                      >
+                        <Settings className="h-3 w-3" />
+                        <span>Manage Models</span>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                   {currentMessage.trim() ? (
