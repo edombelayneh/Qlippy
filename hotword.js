@@ -4,6 +4,9 @@ const { PvRecorder } = require('@picovoice/pvrecorder-node');
 const { spawn } = require('child_process');
 const { Porcupine } = require('@picovoice/porcupine-node');
 const fs = require('fs');
+
+// Load environment variables from .env file
+require('dotenv').config();
 // Remove the dependency on electron.js recordingWindow
 // const { mainWindow: recordingWindow } = require('./electron');
 
@@ -22,13 +25,7 @@ let isSpeaking = false;
 const MAX_RECORDING_DURATION = 10000; // 10 seconds
 const outputPath = path.join(app.getPath('temp'), 'recording.wav');
 
-// Sample responses (replace with actual LLM responses later)
-const responses = [
-  "I'm here to help! What can I do for you?",
-  "How can I assist you today?",
-  "I'm listening, what do you need?",
-  "Ready to help! What's on your mind?",
-];
+// Wake word responses removed - avatar only shows without spoken greeting
 
 // Function to list available audio devices
 async function listAudioDevices() {
@@ -230,19 +227,42 @@ const createTray = () => {
 
 const initVoiceDetection = async () => {
   try {
+    const accessKey = process.env.PORCUPINE_ACCESS_KEY;
+    
+    if (!accessKey || accessKey === 'your_new_access_key_here') {
+      console.error('❌ Porcupine access key not configured!');
+      console.error('📝 Please follow these steps:');
+      console.error('1. Visit https://console.picovoice.ai/');
+      console.error('2. Sign up for a free account');
+      console.error('3. Generate an access key');
+      console.error('4. Update your .env file with: PORCUPINE_ACCESS_KEY=your_actual_key');
+      console.error('5. Restart the application');
+      throw new Error('Porcupine access key not configured. Please see console for instructions.');
+    }
+
     // Initialize Porcupine for wake word detection
     porcupine = new Porcupine(
-      process.env.PORCUPINE_ACCESS_KEY || 'HHPwuTWXXe2cG7I9hSY+cWRriEIJwTxfaG22678ChfRcYCoCOOz6Nw==',  // Get from environment variable
+      accessKey,
       ['Hey-Qlippy.ppn'],  // Using the custom wake word model
       [0.7]  // Wake word sensitivity - increased for better detection
     );
 
     // Initialize audio recorder
     recorder = new PvRecorder(porcupine.frameLength, -1); // -1 for default device
-    console.log('Voice detection initialized');
+    console.log('✅ Voice detection initialized successfully');
     
   } catch (error) {
-    console.error('Failed to initialize voice detection:', error);
+    console.error('❌ Failed to initialize voice detection:', error);
+    
+    if (error.message.includes('00000136')) {
+      console.error('🔑 This error indicates your access key has reached its activation limit.');
+      console.error('📝 To fix this:');
+      console.error('1. Visit https://console.picovoice.ai/');
+      console.error('2. Generate a new access key');
+      console.error('3. Update your .env file');
+      console.error('4. Restart the application');
+    }
+    
     throw error;
   }
 };
@@ -486,11 +506,7 @@ const handleWakeWord = async () => {
   mainWindow.show();
   mainWindow.webContents.send('wake-word-detected');
   
-  // Speak a random greeting
-  const greeting = responses[Math.floor(Math.random() * responses.length)];
-  await speakResponse(greeting);
-  
-  // Start recording after greeting
+  // Start recording immediately (no spoken greeting)
   startRecording();
 };
 
