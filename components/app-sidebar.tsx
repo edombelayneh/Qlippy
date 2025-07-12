@@ -48,13 +48,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         title: "Plugins",
         url: "/plugins",
         icon: Blocks,
-        isActive: true,
+        // isActive: true,
       },
     ],
     navSecondary: [
       {
         title: "Settings",
-        url: "#",
+        url: "/settings",
         icon: Settings,
       },
     ],
