@@ -5,7 +5,10 @@ const { PvRecorder } = require("@picovoice/pvrecorder-node");
 const { spawn } = require('child_process');
 const fs = require('fs');
 
-const accessKey = "eDGFUBlFfqwPu09E2Umkne947P+RobsTREdrWjsERC61iYgk16vy7w==";
+// Load environment variables
+require('dotenv').config();
+
+const accessKey = process.env.PORCUPINE_ACCESS_KEY;
 
 let mainWindow;
 let avatarWindow;
@@ -59,6 +62,16 @@ function createAvatarWindow() {
 
 function startHotwordDetection() {
   try {
+    // Check if access key is configured
+    if (!accessKey) {
+      console.error("❌ Porcupine access key not configured!");
+      console.error("Please set the PORCUPINE_ACCESS_KEY environment variable.");
+      console.error("1. Copy .env.example to .env");
+      console.error("2. Get a free access key from: https://console.picovoice.ai/");
+      console.error("3. Add your access key to the .env file");
+      return;
+    }
+
     const keywordPaths = [path.join(__dirname, "Hey-Qlippy.ppn")];
     const sensitivities = [0.5];
     const porcupine = new Porcupine(accessKey, keywordPaths, sensitivities);
