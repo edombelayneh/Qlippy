@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { qlippyAPI, Conversation, Message } from '@/lib/api';
 
 interface UseConversationsReturn {
@@ -6,6 +6,7 @@ interface UseConversationsReturn {
   activeConversation: Conversation | null;
   loading: boolean;
   error: string | null;
+  currentUserId: string | null;
   loadConversations: (userId: string) => Promise<void>;
   createConversation: (userId: string, title?: string, folder?: string) => Promise<Conversation>;
   loadConversation: (conversationId: string) => Promise<void>;
@@ -22,16 +23,22 @@ export function useConversations(): UseConversationsReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const loadingRef = useRef(false);
 
   const loadConversations = useCallback(async (userId: string) => {
+    // Prevent multiple simultaneous calls
+    if (loadingRef.current) return;
+    
     console.log('Loading conversations for user:', userId);
     setLoading(true);
     setError(null);
     setCurrentUserId(userId);
+    loadingRef.current = true;
     
     try {
+      console.log('Calling qlippyAPI.getConversations...');
       const conversationsData = await qlippyAPI.getConversations(userId);
-      console.log('Loaded conversations:', conversationsData.length);
+      console.log('Loaded conversations:', conversationsData.length, conversationsData);
       setConversations(conversationsData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load conversations';
@@ -39,6 +46,7 @@ export function useConversations(): UseConversationsReturn {
       console.error('Failed to load conversations:', err);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
@@ -87,7 +95,9 @@ export function useConversations(): UseConversationsReturn {
   ): Promise<Message> => {
     console.log('Adding message:', { conversationId, role, contentLength: content.length });
     try {
+      console.log('Calling qlippyAPI.addMessage...');
       const message = await qlippyAPI.addMessage(conversationId, role, content);
+      console.log('Message added successfully:', message);
       
       // Update active conversation with new message
       if (activeConversation && activeConversation.id === conversationId) {
@@ -112,6 +122,7 @@ export function useConversations(): UseConversationsReturn {
       
       return message;
     } catch (err) {
+      console.error('Error adding message:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to add message';
       setError(errorMessage);
       throw err;
@@ -182,6 +193,7 @@ export function useConversations(): UseConversationsReturn {
     activeConversation,
     loading,
     error,
+    currentUserId,
     loadConversations,
     createConversation,
     loadConversation,

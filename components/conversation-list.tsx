@@ -10,6 +10,7 @@ interface Conversation {
   id: string
   title: string
   messages: any[]
+  messageCount: number
   lastUpdated: Date
   folder?: string
 }
@@ -96,7 +97,7 @@ export function ConversationList({
                       {conversation.title}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {conversation.messages.length} messages
+                      {conversation.messageCount} messages
                     </div>
                   </div>
                   

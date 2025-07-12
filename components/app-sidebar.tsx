@@ -37,6 +37,7 @@ interface Conversation {
   id: string
   title: string
   messages: any[]
+  messageCount: number
   lastUpdated: Date
   folder?: string
 }

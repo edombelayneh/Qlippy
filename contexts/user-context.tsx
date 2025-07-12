@@ -26,21 +26,26 @@ export function UserProvider({ children }: { children: ReactNode }) {
         
         // Try to get existing user from localStorage
         const savedUserId = localStorage.getItem('qlippy_user_id')
+        console.log('Saved user ID from localStorage:', savedUserId)
         
         if (savedUserId) {
           // Try to get the existing user
           try {
+            console.log('Attempting to get existing user:', savedUserId)
             const existingUser = await qlippyAPI.getUser(savedUserId)
+            console.log('Existing user found:', existingUser)
             setUser(existingUser)
             return
           } catch (err) {
             // User doesn't exist, create a new one
-            console.log('Existing user not found, creating new user')
+            console.log('Existing user not found, creating new user:', err)
           }
         }
         
         // Create a new user with a default name
+        console.log('Creating new user...')
         const newUser = await qlippyAPI.createUser('Qlippy User')
+        console.log('New user created:', newUser)
         setUser(newUser)
         localStorage.setItem('qlippy_user_id', newUser.id)
         

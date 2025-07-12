@@ -30,7 +30,7 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ECHO = False  # Set to False to reduce SQL logging noise
 
 class ProductionConfig(Config):
     DEBUG = False

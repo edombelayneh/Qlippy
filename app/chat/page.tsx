@@ -44,6 +44,7 @@ interface Conversation {
   id: string
   title: string
   messages: Message[]
+  messageCount: number
   lastUpdated: Date
   folder?: string
 }
@@ -82,6 +83,7 @@ export default function ChatPage() {
     updateConversation,
     deleteConversation,
     setActiveConversation,
+    currentUserId,
   } = useConversations()
 
   const [isLoading, setIsLoading] = React.useState(true)
@@ -97,6 +99,7 @@ export default function ChatPage() {
   const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
   const [showAddSpaceDialog, setShowAddSpaceDialog] = React.useState(false)
   const [selectedSpaceForNewConversation, setSelectedSpaceForNewConversation] = React.useState<string | null>(null)
+  const hasSetInitialConversation = React.useRef(false)
 
   const [plugins, setPlugins] = React.useState<Plugin[]>([
     {
@@ -155,6 +158,7 @@ export default function ChatPage() {
             timestamp: new Date(msg.timestamp)
           }))
         : [],
+      messageCount: apiConv.message_count || 0, // Use the count from API
       lastUpdated: new Date(apiConv.last_updated),
       folder: apiConv.folder || undefined
     }))
@@ -167,18 +171,35 @@ export default function ChatPage() {
 
   // Load conversations when user is authenticated
   React.useEffect(() => {
-    if (user && !conversationsLoading) {
+    console.log('useEffect for loading conversations:', {
+      user: !!user,
+      user_id: user?.id,
+      conversationsLoading,
+      currentUserId,
+      shouldLoad: user && !conversationsLoading && user.id !== currentUserId
+    })
+    
+    if (user && !conversationsLoading && user.id !== currentUserId) {
       loadConversations(user.id)
     }
-  }, [user, user?.id, conversationsLoading])
+  }, [user?.id, conversationsLoading, loadConversations])
 
   // Set first conversation as active if none selected
   React.useEffect(() => {
-    if (conversations.length > 0 && !activeConversationId) {
+    console.log('useEffect for setting active conversation:', {
+      conversationsLength: conversations.length,
+      activeConversationId,
+      hasSetInitial: hasSetInitialConversation.current,
+      shouldSet: conversations.length > 0 && !activeConversationId && !hasSetInitialConversation.current
+    })
+    
+    if (conversations.length > 0 && !activeConversationId && !hasSetInitialConversation.current) {
+      hasSetInitialConversation.current = true
+      console.log('Setting active conversation to:', conversations[0].id)
       setActiveConversationId(conversations[0].id)
       loadConversation(conversations[0].id)
     }
-  }, [conversations, activeConversationId])
+  }, [conversations, activeConversationId, loadConversation])
 
   // Initialize app
   React.useEffect(() => {
@@ -219,8 +240,65 @@ export default function ChatPage() {
     }
   }, [uploadedFiles])
 
+  // Function to generate a smart title from message content
+  const generateConversationTitle = (content: string): string => {
+    // Remove extra whitespace and get first 3 words
+    const cleanContent = content.trim().replace(/\s+/g, ' ')
+    const firstWords = cleanContent.split(' ').slice(0, 3).join(' ')
+    
+    // If the content is short enough, use it as is
+    if (cleanContent.length <= 50) {
+      return cleanContent
+    }
+    
+    // Otherwise, use the first 3 words and add ellipsis
+    return firstWords.length > 50 ? firstWords.substring(0, 50) + '...' : firstWords
+  }
+
   const handleSendMessage = async () => {
-    if (!currentMessage.trim() || isGenerating || isSending || !user || !activeConversationId) return
+    console.log('handleSendMessage called with:', {
+      currentMessage: currentMessage.trim(),
+      isGenerating,
+      isSending,
+      user: !!user,
+      user_id: user?.id,
+      activeConversationId
+    })
+    
+    // Check if we have a message to send
+    if (!currentMessage.trim()) {
+      console.log('No message to send')
+      return
+    }
+    
+    // Check if we're already processing
+    if (isGenerating || isSending) {
+      console.log('Already processing, ignoring send request')
+      return
+    }
+    
+    // Check if we have a user
+    if (!user) {
+      console.log('No user available')
+      return
+    }
+    
+    // If no active conversation, create one
+    let conversationId = activeConversationId
+    if (!conversationId) {
+      console.log('No active conversation, creating new one')
+      try {
+        // Generate a smart title from the first message
+        const smartTitle = generateConversationTitle(currentMessage)
+        const newConversation = await createConversation(user.id!, smartTitle)
+        conversationId = newConversation.id
+        setActiveConversationId(conversationId)
+        console.log('Created new conversation:', conversationId)
+      } catch (error) {
+        console.error('Failed to create conversation:', error)
+        return
+      }
+    }
 
     const userMessageContent = currentMessage
     setCurrentMessage("")
@@ -229,7 +307,14 @@ export default function ChatPage() {
 
     try {
       // Add user message to backend immediately
-      await addMessage(activeConversationId, "user", userMessageContent)
+      await addMessage(conversationId, "user", userMessageContent)
+      
+      // Update conversation title if it's still the default title
+      const currentConv = conversations.find(c => c.id === conversationId)
+      if (currentConv && (currentConv.title === "New Conversation" || currentConv.title === "New Chat")) {
+        const smartTitle = generateConversationTitle(userMessageContent)
+        await updateConversation(conversationId, { title: smartTitle })
+      }
       
       // Show immediate feedback that message was sent
       console.log('User message sent successfully:', userMessageContent)
@@ -242,7 +327,7 @@ export default function ChatPage() {
         const aiResponse = `I understand you said: "${userMessageContent}". This is a simulated response using ${selectedModelName}. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`
         
         // Add AI response to backend
-        await addMessage(activeConversationId, "assistant", aiResponse)
+        await addMessage(conversationId, "assistant", aiResponse)
         console.log('AI response sent successfully')
         setIsGenerating(false)
       }, 1500)
@@ -381,7 +466,7 @@ export default function ChatPage() {
     try {
       const newConversation = await createConversation(
         user.id,
-        "New Conversation",
+        "New Chat",
         selectedSpaceForNewConversation || undefined
       )
       setActiveConversationId(newConversation.id)
@@ -704,7 +789,10 @@ export default function ChatPage() {
                       <Mic className={`h-4 w-4 ${isRecording ? 'text-red-500' : ''}`} />
                     </Button>
                     <Button
-                      onClick={handleSendMessage}
+                      onClick={() => {
+                        console.log('Send button clicked')
+                        handleSendMessage()
+                      }}
                       disabled={!currentMessage.trim() || isGenerating || isSending}
                     >
                       {isSending ? (
