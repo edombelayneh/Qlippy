@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, MoreHorizontal, Edit, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File } from "lucide-react"
+import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File, AudioLines, CircleStop } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { Button } from "@/components/ui/button"
@@ -27,12 +27,16 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import { generateLLMStreamResponse, speakText, stopSpeaking } from "@/lib/utils"
 
 interface Message {
   id: string
   role: "user" | "assistant"
   content: string
   timestamp: Date
+  isStreaming?: boolean
+  hasStartedStreaming?: boolean
+  isSpeaking?: boolean
 }
 
 interface Conversation {
@@ -173,6 +177,39 @@ export default function ChatPage() {
     }
   }, [uploadedFiles])
 
+  React.useEffect(() => {
+    // Listen for voice commands from Electron
+    if (typeof window !== 'undefined' && (window as any).electron) {
+      // Set up listeners
+      (window as any).electron.receive('voice-command', handleVoiceCommand);
+      (window as any).electron.receive('recording-error', handleRecordingError);
+      (window as any).electron.receive('processing-complete', handleProcessingComplete);
+
+      // Cleanup function
+      return () => {
+        (window as any).electron.removeListener('voice-command');
+        (window as any).electron.removeListener('recording-error');
+        (window as any).electron.removeListener('processing-complete');
+      };
+    }
+  }, []);
+
+  const handleVoiceCommand = (command: string) => {
+    setCurrentMessage(command);
+    // Optionally auto-send the message
+    // handleSendMessage();
+  };
+
+  const handleRecordingError = (error: string) => {
+    console.error('Recording error:', error);
+    // Handle recording error (maybe show a notification)
+  };
+
+  const handleProcessingComplete = () => {
+    // Handle when voice processing is complete
+    console.log('Voice processing complete');
+  };
+
   const handleSendMessage = async () => {
     if (!currentMessage.trim() || isGenerating) return
 
@@ -200,28 +237,103 @@ export default function ChatPage() {
     setUploadedFiles([]) // Clear uploaded files after sending
     setIsGenerating(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `I understand you said: "${userMessage.content}". This is a simulated response using ${availableModels.find(m => m.id === selectedModel)?.name}. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`,
-        timestamp: new Date(),
+    // Create a placeholder message for the assistant's response
+    const assistantMessageId = (Date.now() + 1).toString()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      isStreaming: true,
+      hasStartedStreaming: false, // Initially false until we get first token
+    }
+
+    // Add the placeholder message
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === activeConversationId
+          ? {
+              ...conv,
+              messages: [...conv.messages, assistantMessage],
+              lastUpdated: new Date(),
+            }
+          : conv,
+      ),
+    )
+
+    try {
+      // Generate response using streaming
+      const stream = generateLLMStreamResponse(currentMessage)
+      let accumulatedText = ""
+      let isFirstChunk = true
+
+      for await (const chunk of stream) {
+        accumulatedText += chunk
+        // Update the assistant's message with accumulated text
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === activeConversationId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { 
+                          ...msg, 
+                          content: accumulatedText,
+                          hasStartedStreaming: true, // Set to true on first chunk
+                        }
+                      : msg
+                  ),
+                  lastUpdated: new Date(),
+                }
+              : conv,
+          ),
+        )
+        isFirstChunk = false
       }
 
+      // Mark message as complete after streaming
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === activeConversationId
             ? {
                 ...conv,
-                messages: [...conv.messages, assistantMessage],
+                messages: conv.messages.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, isStreaming: false }
+                    : msg
+                ),
                 lastUpdated: new Date(),
               }
             : conv,
         ),
       )
+    } catch (error) {
+      // Handle error - update the error message
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === activeConversationId
+            ? {
+                ...conv,
+                messages: conv.messages.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? {
+                        ...msg,
+                        content:
+                          "I apologize, but I'm having trouble connecting to the local LLM server. Please make sure it's running and try again.",
+                        isStreaming: false,
+                        hasStartedStreaming: true,
+                      }
+                    : msg
+                ),
+                lastUpdated: new Date(),
+              }
+            : conv,
+        ),
+      )
+    } finally {
       setIsGenerating(false)
-    }, 1500)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -357,6 +469,99 @@ export default function ChatPage() {
 
   const currentModel = availableModels.find(m => m.id === selectedModel)
 
+  const handleSpeakClick = async (message: Message) => {
+    try {
+      // If already speaking, stop it
+      if (message.isSpeaking) {
+        await stopSpeaking();
+        // Add delay before updating UI
+        setTimeout(() => {
+          setConversations(prev =>
+            prev.map(conv =>
+              conv.id === activeConversationId
+                ? {
+                    ...conv,
+                    messages: conv.messages.map(msg =>
+                      msg.id === message.id
+                        ? { ...msg, isSpeaking: false }
+                        : msg
+                    ),
+                  }
+                : conv
+            )
+          );
+        }, 5000); // 5 second delay
+        return;
+      }
+
+      // Stop any other currently speaking message
+      setConversations(prev =>
+        prev.map(conv => ({
+          ...conv,
+          messages: conv.messages.map(msg => ({
+            ...msg,
+            isSpeaking: false
+          }))
+        }))
+      );
+
+      // Start speaking this message
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === activeConversationId
+            ? {
+                ...conv,
+                messages: conv.messages.map(msg =>
+                  msg.id === message.id
+                    ? { ...msg, isSpeaking: true }
+                    : msg
+                ),
+              }
+            : conv
+        )
+      );
+
+      await speakText(message.content);
+
+      // After speaking is done, update the state with delay
+      setTimeout(() => {
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === activeConversationId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map(msg =>
+                    msg.id === message.id
+                      ? { ...msg, isSpeaking: false }
+                      : msg
+                  ),
+                }
+              : conv
+          )
+        );
+      }, 8000);
+    } catch (error) {
+      console.error('Error in speak click:', error);
+      // Reset speaking state on error with delay
+      setTimeout(() => {
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === activeConversationId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map(msg =>
+                    msg.id === message.id
+                      ? { ...msg, isSpeaking: false }
+                      : msg
+                    ),
+                  }
+                : conv
+            )
+        );
+      });
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -395,102 +600,116 @@ export default function ChatPage() {
               <div className="space-y-6 max-w-4xl mx-auto p-4 pb-6">
                 {activeConversation?.messages.map((message) => (
                   <div key={message.id} className="space-y-3">
-                                      {message.role === "user" ? (
-                    // User Message - Card Style with hover actions
-                    <div className="flex justify-end">
-                      <div className="group max-w-[80%]">
-                        <Card className="bg-muted border-border/50">
-                          <CardContent className="p-4">
-                            <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
-                          </CardContent>
-                        </Card>
-                        
-                        {/* Action Buttons - appear on hover */}
-                        <div className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => navigator.clipboard.writeText(message.content)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Edit message')}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                    {message.role === "user" ? (
+                      // User Message - Card Style with hover actions
+                      <div className="flex justify-end">
+                        <div className="group max-w-[80%]">
+                          <Card className="bg-muted border-border/50">
+                            <CardContent className="p-4">
+                              <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
+                            </CardContent>
+                          </Card>
+                          
+                          {/* Action Buttons - appear on hover */}
+                          <div className="flex items-center justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => navigator.clipboard.writeText(message.content)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => console.log('Edit message')}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
+                    ) : (
                       // AI Response - Free Text with Actions
                       <div className="space-y-3">
                         <div className="prose prose-sm max-w-none">
-                          <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-                            {message.content}
-                          </p>
+                          {message.isStreaming && !message.hasStartedStreaming ? (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Thinking...</span>
+                            </div>
+                          ) : (
+                            <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                              {message.content}
+                            </p>
+                          )}
                         </div>
                         
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Thumbs up')}
-                          >
-                            <ThumbsUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Thumbs down')}
-                          >
-                            <ThumbsDown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => navigator.clipboard.writeText(message.content)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Regenerate')}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-                            onClick={() => console.log('Share')}
-                          >
-                            <Share className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {/* Action Buttons - only show when not streaming */}
+                        {!message.isStreaming && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => console.log('Thumbs up')}
+                            >
+                              <ThumbsUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => console.log('Thumbs down')}
+                            >
+                              <ThumbsDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => navigator.clipboard.writeText(message.content)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => console.log('Regenerate')}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => console.log('Share')}
+                            >
+                              <Share className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
+                              onClick={() => handleSpeakClick(message)}
+                            >
+                              {message.isSpeaking ? (
+                                <CircleStop className="h-4 w-4" />
+                              ) : (
+                                <AudioLines className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 ))}
 
-                {isGenerating && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
-                    </div>
-                  </div>
-                )}
+                {/* Remove the thinking indicator since we now show streaming in real-time */}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>

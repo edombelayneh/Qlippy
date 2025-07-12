@@ -16,6 +16,8 @@ function createMainWindow() {
     minHeight: 800,
     webPreferences: {
       contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js')
     },
   });
 
@@ -28,29 +30,39 @@ function createMainWindow() {
 }
 
 function createAvatarWindow() {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const { width } = screen.getPrimaryDisplay().workAreaSize;
+  
   avatarWindow = new BrowserWindow({
-    width: 200,
-    height: 200,
+    width: 150,
+    height: 150,
     x: width - 200,
-    y: height - 200,
+    y: 100,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    show: false,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
-      contextIsolation: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js')
     },
   });
 
-  avatarWindow.loadFile(path.join(__dirname, "index.html"));
-
-  avatarWindow.on("closed", () => {
-    avatarWindow = null;
-  });
+  avatarWindow.loadFile("index.html");
 }
+
+app.whenReady().then(createAvatarWindow);
+
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
+});
+
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createAvatarWindow();
+  }
+});
 
 function startHotwordDetection() {
   try {
@@ -71,6 +83,9 @@ function startHotwordDetection() {
       const keywordIndex = porcupine.process(pcm);
       if (keywordIndex !== -1) {
         console.log('"Hey Qlippy" detected!');
+        if (mainWindow) {
+          mainWindow.webContents.send('voice-command', 'Hey Qlippy detected!');
+        }
         if (avatarWindow) {
           avatarWindow.show();
           avatarWindow.focus();
@@ -79,13 +94,11 @@ function startHotwordDetection() {
     }, 10);
   } catch (err) {
     console.error("Error initializing Picovoice:", err);
+    if (mainWindow) {
+      mainWindow.webContents.send('recording-error', err.message);
+    }
   }
 }
-
-app.whenReady().then(() => {
-  createAvatarWindow();
-  startHotwordDetection();
-});
 
 ipcMain.on("open-main-app", () => {
   if (!mainWindow) {
@@ -95,3 +108,5 @@ ipcMain.on("open-main-app", () => {
     avatarWindow.close();
   }
 });
+
+startHotwordDetection();
