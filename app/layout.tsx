@@ -1,45 +1,45 @@
+import type { Metadata } from "next"
+import { Geist, Geist_Mono } from "next/font/google"
+import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { ThemeInitializer } from "@/components/theme-initializer";
+import { UserProvider } from "@/contexts/user-context"
 
-const geistSans = Geist({
+const geist = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-});
+})
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-});
+})
 
 export const metadata: Metadata = {
-  title: "Qlippy - AI Assistant",
-  description: "Your intelligent AI assistant for conversations, plugins, and more",
-};
+  title: "Qlippy - AI Chat Assistant",
+  description: "A modern AI chat application with local storage",
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <>
-      <html lang="en" suppressHydrationWarning>
-        <head />
-        <body>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <ThemeInitializer />
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geist.variable} ${geistMono.variable} antialiased`}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <UserProvider>
             {children}
-          </ThemeProvider>
-        </body>
-      </html>
-    </>
+          </UserProvider>
+        </ThemeProvider>
+      </body>
+    </html>
   )
 }

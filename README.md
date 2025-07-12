@@ -1,1 +1,332 @@
 # Qlippy
+
+A modern AI chat application with local storage, built with Next.js frontend and Flask backend.
+
+## Features
+
+- 🤖 **AI Chat Interface** - Clean, modern chat interface
+- 💾 **Local Storage** - All data stored locally using SQLite
+- 🔌 **Plugin System** - Extensible plugin architecture
+- 📁 **Conversation Management** - Organize chats with folders
+- 🎨 **Modern UI** - Beautiful, responsive design with dark mode
+- ⚡ **Fast & Lightweight** - Built with Next.js and Flask
+- 🚀 **Single User** - Simple setup, no account creation needed
+
+## Architecture
+
+- **Frontend**: Next.js 15 with TypeScript, Tailwind CSS, and Radix UI
+- **Backend**: Flask with SQLAlchemy and SQLite
+- **Database**: SQLite (local storage)
+- **Styling**: Tailwind CSS with custom components
+
+## Environment Setup
+
+### 1. Configure Environment Variables
+
+Create a `.env` file in the root directory:
+
+```bash
+cp .env.example .env
+```
+
+Edit the `.env` file and add your Picovoice access key:
+
+```env
+PICOVOICE_ACCESS_KEY=your_actual_access_key_here
+```
+
+**To get a Picovoice access key:**
+1. Go to [Picovoice Console](https://console.picovoice.ai/)
+2. Create an account or log in
+3. Get your free access key
+4. Add it to the `.env` file
+
+> **Note**: The `.env` file is already in `.gitignore` to keep your access key secure.
+
+**Quick Setup:**
+```bash
+npm run setup
+```
+This will guide you through the environment configuration process.
+
+## Quick Start
+
+### Option 1: Use the Development Script (Recommended)
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd Qlippy
+   ```
+
+2. **Run the development script**
+   ```bash
+   ./start_dev.sh
+   ```
+
+This script will:
+- Check prerequisites (Python 3, Node.js, npm)
+- Set up virtual environment for backend
+- Install all dependencies
+- Start both frontend and backend servers
+
+### Option 2: Manual Setup
+
+#### Backend Setup
+
+1. **Navigate to backend directory**
+   ```bash
+   cd backend
+   ```
+
+2. **Create virtual environment**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Start the backend server**
+   ```bash
+   python run.py
+   ```
+
+The backend will be available at `http://localhost:5001`
+
+#### Frontend Setup
+
+1. **Install Node.js dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+The frontend will be available at `http://localhost:3000`
+
+## How to Use
+
+### 1. First Time Setup
+1. Open `http://localhost:3000` in your browser
+2. The app will automatically create a user account for you
+3. You can start chatting immediately - no setup required!
+
+### 2. Using the Chat
+1. **Create a new conversation** - Click "New Chat" in the sidebar
+2. **Send messages** - Type in the input area and press Enter
+3. **Organize conversations** - Use folders to categorize your chats
+4. **Switch models** - Select different AI models from the dropdown
+5. **Manage plugins** - Enable/disable plugins as needed
+
+### 3. Data Storage
+- All conversations are saved locally in SQLite database
+- Messages persist between sessions
+- No internet connection required (except for AI responses)
+- Your data stays private on your computer
+
+## API Endpoints
+
+### Health Check
+- `GET /api/health` - Check server status
+
+### Users
+- `POST /api/users` - Create a new user
+- `GET /api/users/<user_id>` - Get user information
+
+### Conversations
+- `GET /api/users/<user_id>/conversations` - Get all conversations
+- `POST /api/users/<user_id>/conversations` - Create a new conversation
+- `GET /api/conversations/<conversation_id>` - Get conversation with messages
+- `PUT /api/conversations/<conversation_id>` - Update conversation
+- `DELETE /api/conversations/<conversation_id>` - Delete conversation
+
+### Messages
+- `POST /api/conversations/<conversation_id>/messages` - Add a message
+- `PUT /api/messages/<message_id>` - Update a message
+- `DELETE /api/messages/<message_id>` - Delete a message
+
+### Plugins
+- `GET /api/users/<user_id>/plugins` - Get all plugins
+- `POST /api/users/<user_id>/plugins` - Create a new plugin
+- `PUT /api/plugins/<plugin_id>` - Update a plugin
+- `DELETE /api/plugins/<plugin_id>` - Delete a plugin
+
+## Database Schema
+
+### Users
+- `id` (UUID) - Primary key
+- `username` (String) - Unique username
+- `created_at` (DateTime) - Account creation timestamp
+
+### Conversations
+- `id` (UUID) - Primary key
+- `title` (String) - Conversation title
+- `user_id` (UUID) - Foreign key to users
+- `folder` (String) - Optional folder categorization
+- `last_updated` (DateTime) - Last activity timestamp
+- `created_at` (DateTime) - Creation timestamp
+
+### Messages
+- `id` (UUID) - Primary key
+- `conversation_id` (UUID) - Foreign key to conversations
+- `role` (String) - 'user' or 'assistant'
+- `content` (Text) - Message content
+- `timestamp` (DateTime) - Message timestamp
+
+### Plugins
+- `id` (UUID) - Primary key
+- `user_id` (UUID) - Foreign key to users
+- `name` (String) - Plugin name
+- `description` (Text) - Plugin description
+- `enabled` (Boolean) - Plugin enabled status
+- `created_at` (DateTime) - Creation timestamp
+
+## Development
+
+### Project Structure
+```
+Qlippy/
+├── app/                    # Next.js app directory
+│   ├── chat/              # Chat page
+│   ├── plugins/           # Plugins page
+│   ├── search/            # Search page
+│   └── settings/          # Settings page
+├── backend/               # Flask backend
+│   ├── app.py             # Main Flask app
+│   ├── config.py          # Configuration
+│   ├── models.py          # Database models
+│   ├── routes.py          # API routes
+│   ├── run.py             # Server startup
+│   └── requirements.txt   # Python dependencies
+├── components/            # React components
+│   ├── ui/               # UI components
+│   └── ...               # Feature components
+├── contexts/             # React contexts
+├── hooks/                # React hooks
+├── lib/                  # Utilities and API
+└── public/               # Static assets
+```
+
+### Testing
+
+#### Backend Testing
+```bash
+cd backend
+python test_api.py
+```
+
+#### Frontend Testing
+```bash
+npm run test
+```
+
+### Building for Production
+
+#### Backend
+```bash
+cd backend
+pip install -r requirements.txt
+python app.py
+```
+
+#### Frontend
+```bash
+npm run build
+npm start
+```
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```env
+# API Configuration
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+
+# Backend Configuration (optional)
+FLASK_ENV=development
+SECRET_KEY=your-secret-key-here
+```
+
+### Backend Configuration
+
+Edit `backend/config.py` to modify:
+- Database URI
+- CORS origins
+- Secret keys
+- File upload limits
+- Logging settings
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port already in use**
+   - Backend: Change port in `backend/run.py`
+   - Frontend: Change port in `package.json` scripts
+
+2. **Database errors**
+   - Delete `backend/qlippy.db` and restart the server
+
+3. **CORS errors**
+   - Check CORS origins in `backend/config.py`
+
+4. **Module not found errors**
+   - Run `npm install` for frontend
+   - Run `pip install -r requirements.txt` for backend
+
+5. **App not loading**
+   - Make sure backend is running on port 5001
+   - Check browser console for API errors
+
+### Logs
+
+- **Backend**: Check terminal output for Flask logs
+- **Frontend**: Check browser console and terminal output
+
+## Current Status
+
+✅ **Backend**: Fully working on `http://localhost:5001`
+✅ **Database**: SQLite with all tables created
+✅ **API**: All endpoints tested and working
+✅ **Frontend Integration**: Single user auto-creation
+✅ **Message Storage**: All messages saved to database
+✅ **Conversation Management**: Create, load, and delete conversations
+✅ **Simplified Setup**: No username required, auto-creates user
+
+## Next Steps
+
+1. **AI Integration**: Connect to your preferred AI model
+2. **File Uploads**: Implement file attachment functionality
+3. **Voice Integration**: Add voice input/output
+4. **Plugin System**: Implement actual plugin functionality
+5. **Search**: Add conversation search functionality
+6. **Export**: Add conversation export features
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the ISC License.
+
+## Support
+
+For issues and questions:
+1. Check the troubleshooting section
+2. Review the API documentation
+3. Open an issue on GitHub

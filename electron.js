@@ -3,16 +3,19 @@ const path = require("path");
 const { Porcupine } = require("@picovoice/porcupine-node");
 const { PvRecorder } = require("@picovoice/pvrecorder-node");
 const { spawn } = require("child_process");
+require('dotenv').config();
 const fs = require("fs");
 const os = require("os");
 
-const accessKey = "eDGFUBlFfqwPu09E2Umkne947P+RobsTREdrWjsERC61iYgk16vy7w==";
+const accessKey = process.env.PICOVOICE_ACCESS_KEY || "YOUR_ACCESS_KEY_HERE";
 
 let mainWindow;
 let avatarWindow;
 let isRecording = false;
 let recordingProcess = null;
 let audioFilePath = null;
+let backendProcess = null;
+let frontendProcess = null;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -31,6 +34,97 @@ function createMainWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+}
+
+function waitForBackend() {
+  return new Promise((resolve, reject) => {
+    const http = require('http');
+    const options = {
+      hostname: 'localhost',
+      port: 5001,
+      path: '/api/health',
+      method: 'GET',
+      timeout: 30000
+    };
+    
+    const req = http.request(options, (res) => {
+      if (res.statusCode === 200) {
+        console.log('✅ Backend is ready');
+        resolve();
+      } else {
+        reject(new Error(`Backend responded with status: ${res.statusCode}`));
+      }
+    });
+    
+    req.on('error', (err) => {
+      console.log('Waiting for backend to be ready...');
+      setTimeout(() => waitForBackend().then(resolve).catch(reject), 1000);
+    });
+    
+    req.setTimeout(5000, () => {
+      req.destroy();
+      console.log('Backend timeout, retrying...');
+      setTimeout(() => waitForBackend().then(resolve).catch(reject), 1000);
+    });
+    
+    req.end();
+  });
+}
+
+function startBackend() {
+  console.log('🚀 Starting Flask backend...');
+  const backendPath = path.join(__dirname, 'backend');
+  
+  // Use the virtual environment's Python
+  const pythonPath = path.join(backendPath, 'venv', 'bin', 'python');
+  
+  backendProcess = spawn(pythonPath, ['app.py'], {
+    cwd: backendPath,
+    stdio: 'pipe'
+  });
+  
+  backendProcess.stdout.on('data', (data) => {
+    console.log('Backend:', data.toString().trim());
+  });
+  
+  backendProcess.stderr.on('data', (data) => {
+    console.log('Backend Error:', data.toString().trim());
+  });
+  
+  backendProcess.on('close', (code) => {
+    console.log(`Backend process exited with code ${code}`);
+  });
+  
+  // Wait a bit for backend to start
+  return new Promise((resolve) => {
+    setTimeout(resolve, 2000);
+  });
+}
+
+function startFrontend() {
+  console.log('🚀 Starting Next.js frontend...');
+  
+  frontendProcess = spawn('npm', ['run', 'dev'], {
+    cwd: __dirname,
+    stdio: 'pipe'
+  });
+  
+  frontendProcess.stdout.on('data', (data) => {
+    console.log('Frontend:', data.toString().trim());
+  });
+  
+  frontendProcess.stderr.on('data', (data) => {
+    console.log('Frontend Error:', data.toString().trim());
+  });
+  
+  frontendProcess.on('close', (code) => {
+    console.log(`Frontend process exited with code ${code}`);
+  });
+  
+  // Wait for frontend to be ready
+  return new Promise((resolve) => {
+    setTimeout(resolve, 5000);
   });
 }
 
@@ -148,6 +242,13 @@ function processAudioWithWhisper(audioFile) {
 
 function startHotwordDetection() {
   try {
+    if (!accessKey || accessKey === "YOUR_ACCESS_KEY_HERE") {
+      console.error("❌ PICOVOICE_ACCESS_KEY not configured in .env file");
+      console.log("Please add your Picovoice access key to the .env file:");
+      console.log("PICOVOICE_ACCESS_KEY=your_actual_access_key_here");
+      return;
+    }
+    
     const keywordPaths = [path.join(__dirname, "Hey-Qlippy.ppn")];
     const sensitivities = [0.5];
     const porcupine = new Porcupine(accessKey, keywordPaths, sensitivities);
@@ -176,9 +277,41 @@ function startHotwordDetection() {
   }
 }
 
-app.whenReady().then(() => {
-  createAvatarWindow();
-  startHotwordDetection();
+app.whenReady().then(async () => {
+  console.log('🎯 Qlippy is starting up...');
+  
+  try {
+    // Start backend first
+    await startBackend();
+    console.log('✅ Backend started successfully');
+    
+    // Wait for backend to be ready
+    await waitForBackend();
+    
+    // Start frontend
+    await startFrontend();
+    console.log('✅ Frontend started successfully');
+    
+    // Create avatar window
+    createAvatarWindow();
+    
+    // Check if access key is configured
+    if (!accessKey || accessKey === "YOUR_ACCESS_KEY_HERE") {
+      console.log("⚠️  Hotword detection disabled - access key not configured");
+      console.log("💡 To enable wake word detection:");
+      console.log("   1. Get a free access key from https://console.picovoice.ai/");
+      console.log("   2. Add it to your .env file: PICOVOICE_ACCESS_KEY=your_key_here");
+      console.log("   3. Restart the app");
+    } else {
+      startHotwordDetection();
+    }
+    
+    console.log("✅ Voice button in chat is still available for voice input");
+    console.log("🎉 Qlippy is ready! Open the main app to start chatting.");
+    
+  } catch (error) {
+    console.error('❌ Error starting services:', error);
+  }
 });
 
 ipcMain.on("open-main-app", () => {
@@ -201,4 +334,48 @@ ipcMain.on("stop-recording", () => {
 
 ipcMain.on("voice-command-processed", (event, command) => {
   console.log('Voice command processed:', command);
+});
+
+// Cleanup function to stop all processes
+function cleanup() {
+  console.log('🧹 Cleaning up processes...');
+  
+  if (backendProcess) {
+    console.log('Stopping backend...');
+    backendProcess.kill('SIGTERM');
+  }
+  
+  if (frontendProcess) {
+    console.log('Stopping frontend...');
+    frontendProcess.kill('SIGTERM');
+  }
+  
+  if (recordingProcess) {
+    console.log('Stopping recording...');
+    recordingProcess.kill('SIGTERM');
+  }
+}
+
+// Handle app quit
+app.on('before-quit', () => {
+  cleanup();
+});
+
+// Handle window closed
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    cleanup();
+    app.quit();
+  }
+});
+
+// Handle process termination
+process.on('SIGINT', () => {
+  cleanup();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  cleanup();
+  process.exit(0);
 });

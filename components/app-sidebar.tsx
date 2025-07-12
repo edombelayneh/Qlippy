@@ -13,6 +13,7 @@ import { NavFavorites } from "@/components/nav-favorites"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavSpaces } from "@/components/nav-spaces"
+import { ConversationList } from "@/components/conversation-list"
 import {
   Sidebar,
   SidebarContent,
@@ -32,11 +33,51 @@ interface Space {
   conversationCount?: number
 }
 
+interface Conversation {
+  id: string
+  title: string
+  messages: any[]
+  lastUpdated: Date
+  folder?: string
+}
+
+interface Plugin {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+}
+
+interface AIModel {
+  id: string
+  name: string
+  description: string
+}
+
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  // Legacy props for backward compatibility
   spaces?: Space[]
   selectedSpace?: string | null
   onSpaceSelect?: (spaceId: string | null) => void
   onAddSpace?: () => void
+  
+  // New props for conversation management
+  conversations?: Conversation[]
+  activeConversationId?: string | null
+  onConversationSelect?: (id: string) => void
+  onCreateConversation?: () => void
+  onDeleteConversation?: () => void
+  
+  // Plugin and model management
+  plugins?: Plugin[]
+  onTogglePlugin?: (pluginId: string) => void
+  availableModels?: AIModel[]
+  selectedModel?: string
+  onModelSelect?: (modelId: string) => void
+  
+  // Space selection for new conversations
+  selectedSpaceForNewConversation?: string | null
+  onSelectSpaceForNewConversation?: (spaceId: string | null) => void
 }
 
 export function AppSidebar({ 
@@ -44,6 +85,18 @@ export function AppSidebar({
   selectedSpace = null,
   onSpaceSelect,
   onAddSpace,
+  conversations = [],
+  activeConversationId,
+  onConversationSelect,
+  onCreateConversation,
+  onDeleteConversation,
+  plugins = [],
+  onTogglePlugin,
+  availableModels = [],
+  selectedModel,
+  onModelSelect,
+  selectedSpaceForNewConversation,
+  onSelectSpaceForNewConversation,
   ...props 
 }: AppSidebarProps) {
   // This is sample data.
@@ -60,6 +113,7 @@ export function AppSidebar({
         title: "New Chat",
         url: "/chat",
         icon: SquarePen,
+        onClick: onCreateConversation,
       },
       {
         title: "Search Chats",
@@ -70,7 +124,6 @@ export function AppSidebar({
         title: "Plugins",
         url: "/plugins",
         icon: Blocks,
-        // isActive: true,
       },
     ],
     navSecondary: [
@@ -152,12 +205,38 @@ export function AppSidebar({
         <NavMain items={data.navMain} />
       </SidebarHeader>
       <SidebarContent>
-        <NavSpaces 
-          spaces={spaces}
-          selectedSpace={selectedSpace}
-          onSpaceSelect={onSpaceSelect || (() => {})}
-          onAddSpace={onAddSpace}
-        />
+        {/* Show conversations if available, otherwise show spaces */}
+        {conversations.length > 0 ? (
+          <ConversationList
+            conversations={conversations}
+            activeConversationId={activeConversationId || ""}
+            onConversationSelect={onConversationSelect || (() => {})}
+            onNewConversation={onCreateConversation || (() => {})}
+            folders={spaces.map(space => ({
+              id: space.id,
+              name: space.name,
+              icon: space.icon,
+              color: space.color
+            }))}
+            selectedFolder={selectedSpace}
+            onFolderSelect={onSpaceSelect || (() => {})}
+            onAddFolder={(conversationId, folderId) => {
+              // This would need to be implemented
+              console.log('Add folder to conversation:', conversationId, folderId)
+            }}
+            onRemoveFolder={(conversationId) => {
+              // This would need to be implemented
+              console.log('Remove folder from conversation:', conversationId)
+            }}
+          />
+        ) : (
+          <NavSpaces 
+            spaces={spaces}
+            selectedSpace={selectedSpace}
+            onSpaceSelect={onSpaceSelect || (() => {})}
+            onAddSpace={onAddSpace}
+          />
+        )}
         <NavFavorites favorites={data.favorites} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
