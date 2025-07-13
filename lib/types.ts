@@ -9,6 +9,7 @@ export interface Conversation {
   id:string
   title: string
   messages: Message[]
+  messageCount: number
   lastUpdated: Date
   folder?: string // Optional folder tag
 }
@@ -38,4 +39,12 @@ export interface Folder {
   name: string
   icon: string
   color: string
+}
+
+export interface Space {
+  id: string
+  name: string
+  icon: string
+  color: string
+  conversationCount?: number
 } 

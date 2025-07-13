@@ -4,76 +4,20 @@ import * as React from "react"
 
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Check, ChevronDown, Copy, ThumbsUp, ThumbsDown, Loader2, Send, Mic, Paperclip, X } from "lucide-react"
 import { useUserContext } from "@/contexts/user-context"
 import { useConversations } from "@/hooks/use-conversations"
 import { qlippyAPI, Message as APIMessage, Conversation as APIConversation } from "@/lib/api"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AddSpaceDialog } from "@/components/add-space-dialog"
-
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  timestamp: Date
-}
-
-interface Conversation {
-  id: string
-  title: string
-  messages: Message[]
-  messageCount: number
-  lastUpdated: Date
-  folder?: string
-}
-
-interface Plugin {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-}
-
-interface AIModel {
-  id: string
-  name: string
-  description: string
-}
-
-interface Space {
-  id: string
-  name: string
-  icon: string
-  color: string
-  conversationCount?: number
-}
-
-interface UploadedFile {
-  id: string
-  file: File
-  preview?: string
-  type: 'image' | 'document' | 'video' | 'audio'
-}
+import { ChatInput } from "@/components/chat/chat-input"
+import { ChatHeader } from "@/components/chat/chat-header"
+import { MessageList } from "@/components/chat/message-list"
+import { Message, Conversation, Plugin, AIModel, Space, UploadedFile } from "@/lib/types"
 
 export default function ChatPage() {
   const { user, loading: userLoading, error: userError } = useUserContext()
@@ -97,6 +41,10 @@ export default function ChatPage() {
   const [currentMessage, setCurrentMessage] = React.useState("")
   const [isGenerating, setIsGenerating] = React.useState(false)
   const [isSending, setIsSending] = React.useState(false)
+  const [isRecording, setIsRecording] = React.useState(false)
+  const [isProcessing, setIsProcessing] = React.useState(false)
+  const [recordingMetrics, setRecordingMetrics] = React.useState<{ max_amplitude?: number; mean_amplitude?: number; duration?: number; } | null>(null)
+  const [hasStartedConversation, setHasStartedConversation] = React.useState(false)
   const [selectedModel, setSelectedModel] = React.useState("gpt-4")
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([])
@@ -115,6 +63,7 @@ export default function ChatPage() {
   const hasSetInitialConversation = React.useRef(false)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const messagesEndRef = React.useRef<HTMLDivElement>(null)
 
   const [plugins, setPlugins] = React.useState<Plugin[]>([
     {
@@ -210,7 +159,7 @@ export default function ChatPage() {
         id: apiConv.id,
         title: apiConv.title,
         messages,
-        messageCount: apiConv.message_count || 0, // Use the count from API
+        messageCount: apiConv.message_count || 0,
         lastUpdated: new Date(apiConv.last_updated),
         folder: apiConv.folder || undefined
       }
@@ -227,8 +176,20 @@ export default function ChatPage() {
   }, [apiConversations])
 
   const currentConversation = conversations.find((c) => c.id === activeConversationId)
-  const messagesEndRef = React.useRef<HTMLDivElement>(null)
-  const isNewConversation = activeConversation?.messages?.length === 0
+  
+  // Check if this is truly a new conversation (no messages yet)
+  const hasMessages = activeConversation?.messages && activeConversation.messages.length > 0
+  const isNewConversation = (!activeConversationId || !activeConversation || !hasMessages) && !hasStartedConversation
+  
+  // Debug logging
+  console.log('Chat state debug:', {
+    activeConversationId,
+    hasActiveConversation: !!activeConversation,
+    activeConversationMessages: activeConversation?.messages?.length || 0,
+    hasMessages,
+    isNewConversation,
+    currentConversationMessages: currentConversation?.messages?.length || 0
+  })
 
   // Load conversations when user is authenticated
   React.useEffect(() => {
@@ -273,33 +234,22 @@ export default function ChatPage() {
   }, [userLoading])
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+      }, 100)
+    })
+  }
+
+  const scrollToBottomImmediate = () => {
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" })
+    })
   }
 
   React.useEffect(() => {
     scrollToBottom()
-  }, [currentConversation?.messages])
-
-  // Auto-resize textarea
-  React.useEffect(() => {
-    const textarea = textareaRef.current
-    if (textarea) {
-      textarea.style.height = 'auto'
-      const newHeight = Math.min(textarea.scrollHeight, 120)
-      textarea.style.height = newHeight + 'px'
-    }
-  }, [currentMessage])
-
-  // Cleanup preview URLs
-  React.useEffect(() => {
-    return () => {
-      uploadedFiles.forEach(file => {
-        if (file.preview) {
-          URL.revokeObjectURL(file.preview)
-        }
-      })
-    }
-  }, [uploadedFiles])
+  }, [currentConversation?.messages, isGenerating])
 
   // Function to generate a smart title from message content
   const generateConversationTitle = (content: string): string => {
@@ -365,6 +315,9 @@ export default function ChatPage() {
     setCurrentMessage("")
     setUploadedFiles([])
     setIsSending(true)
+    
+    // Mark that conversation has started
+    setHasStartedConversation(true)
 
     try {
       // Add user message to backend immediately
@@ -392,6 +345,10 @@ export default function ChatPage() {
       })
       setIsSending(false)
       setIsGenerating(true)
+      // Ensure scroll to bottom after user message
+      setTimeout(() => {
+        scrollToBottomImmediate()
+      }, 50)
 
       // Simulate AI response with markdown formatting test
       setTimeout(async () => {
@@ -466,6 +423,10 @@ $$
         await loadConversation(conversationId)
         console.log('AI response sent successfully')
         setIsGenerating(false)
+        // Ensure scroll to bottom after AI response
+        setTimeout(() => {
+          scrollToBottomImmediate()
+        }, 50)
       }, 1500)
     } catch (error) {
       console.error('Failed to send message:', error)
@@ -482,8 +443,6 @@ $$
       handleSendMessage()
     }
   }
-
-  const [isRecording, setIsRecording] = React.useState(false)
 
   const handleVoiceInput = () => {
     if (isRecording) {
@@ -534,6 +493,7 @@ $$
       )
       setActiveConversationId(newConversation.id)
       setSelectedSpaceForNewConversation(null)
+      setHasStartedConversation(false) // Reset for new conversation
     } catch (error) {
       console.error('Failed to create conversation:', error)
     }
@@ -556,6 +516,19 @@ $$
       }
     } catch (error) {
       console.error('Failed to delete conversation:', error)
+    }
+  }
+
+  const handleDeleteClick = () => {
+    if (activeConversationId) {
+      setShowDeleteDialog(true)
+    }
+  }
+
+  const deleteCurrentConversation = async () => {
+    if (activeConversationId) {
+      await handleDeleteConversation(activeConversationId)
+      setShowDeleteDialog(false)
     }
   }
 
@@ -632,287 +605,88 @@ $$
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full">
-        <AppSidebar
-          spaces={spaces}
-          selectedSpace={selectedSpace}
-          onSpaceSelect={setSelectedSpace}
-          onAddSpace={() => setShowAddSpaceDialog(true)}
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          onConversationSelect={(id: string) => {
-            setActiveConversationId(id)
-            loadConversation(id)
-          }}
-          onCreateConversation={createNewConversation}
-          onDeleteConversation={handleDeleteConversation}
-          onAddFolder={addFolderToConversation}
-          onRemoveFolder={removeFolderFromConversation}
-          plugins={plugins}
-          onTogglePlugin={togglePlugin}
-          availableModels={availableModels}
-          selectedModel={selectedModel}
-          onModelSelect={setSelectedModel}
-          selectedSpaceForNewConversation={selectedSpaceForNewConversation}
-          onSelectSpaceForNewConversation={setSelectedSpaceForNewConversation}
-        />
+      <AppSidebar
+        spaces={spaces}
+        selectedSpace={selectedSpace}
+        onSpaceSelect={setSelectedSpace}
+        onAddSpace={() => setShowAddSpaceDialog(true)}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        onConversationSelect={(id: string) => {
+          setActiveConversationId(id)
+          loadConversation(id)
+          // Check if the new conversation has messages
+          const targetConversation = conversations.find(c => c.id === id)
+          setHasStartedConversation(targetConversation ? targetConversation.messages.length > 0 : false)
+        }}
+        onCreateConversation={createNewConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onAddFolder={addFolderToConversation}
+        onRemoveFolder={removeFolderFromConversation}
+        plugins={plugins}
+        onTogglePlugin={togglePlugin}
+        availableModels={availableModels}
+        selectedModel={selectedModel}
+        onModelSelect={setSelectedModel}
+        selectedSpaceForNewConversation={selectedSpaceForNewConversation}
+        onSelectSpaceForNewConversation={setSelectedSpaceForNewConversation}
+      />
 
-        <SidebarInset className="flex-1 overflow-hidden">
-          <div className="flex flex-col h-full w-full">
-            {/* Header */}
-            <div className="border-b px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <Breadcrumb>
-                    <BreadcrumbList>
-                      <BreadcrumbItem>
-                        <BreadcrumbLink href="/">Home</BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        <BreadcrumbPage>Chat</BreadcrumbPage>
-                      </BreadcrumbItem>
-                    </BreadcrumbList>
-                  </Breadcrumb>
-                </div>
+      <SidebarInset>
+        <div className="flex flex-col h-screen bg-background">
+          {/* Header - Always present when there are messages */}
+          {!isNewConversation && (
+            <ChatHeader
+              onDelete={handleDeleteClick}
+            />
+          )}
 
-                <div className="flex items-center space-x-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        {availableModels.find(m => m.id === selectedModel)?.name}
-                        <ChevronDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {availableModels.map((model) => (
-                        <DropdownMenuItem
-                          key={model.id}
-                          onClick={() => setSelectedModel(model.id)}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <span>{model.name}</span>
-                            {selectedModel === model.id && (
-                              <Check className="h-4 w-4" />
-                            )}
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </div>
+          {/* Chat Messages - Always present, empty for new conversations */}
+          <MessageList
+            messages={currentConversation?.messages || []}
+            isGenerating={isGenerating}
+            messagesEndRef={messagesEndRef}
+          />
 
-            {/* Chat Area */}
-            <div className="flex-1 overflow-hidden min-h-0">
-              <ScrollArea className="h-full w-full">
-                <div className="p-6 space-y-6">
-                  {currentConversation?.messages.length === 0 ? (
-                    <div className="text-center py-12">
-                      <div className="text-4xl mb-4">👋</div>
-                      <h2 className="text-2xl font-semibold mb-2">
-                        Welcome to Qlippy!
-                      </h2>
-                      <p className="text-muted-foreground mb-6">
-                        Start a conversation with your AI assistant. I can help you with
-                        questions, writing, coding, analysis, and much more.
-                      </p>
-                      <div className="flex items-center justify-center space-x-4 text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-2">
-                          <Check className="h-4 w-4" />
-                          <span>Local storage</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Check className="h-4 w-4" />
-                          <span>Privacy focused</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Check className="h-4 w-4" />
-                          <span>Always available</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    currentConversation?.messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${
-                          message.role === "user" ? "justify-end" : "justify-start"
-                        }`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-lg px-4 py-3 ${
-                            message.role === "user"
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted"
-                          }`}
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-1">
-                              <div className="text-sm font-medium mb-1">
-                                {message.role === "user" ? "You" : "AI Assistant"}
-                              </div>
-                              <div className="whitespace-pre-wrap">{message.content}</div>
-                              <div className="text-xs text-muted-foreground mt-2">
-                                {message.timestamp.toLocaleTimeString()}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                              >
-                                <ThumbsUp className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                              >
-                                <ThumbsDown className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  {isGenerating && (
-                    <div className="flex justify-start">
-                      <div className="max-w-[80%] rounded-lg px-4 py-3 bg-muted">
-                        <div className="flex items-center space-x-2">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>AI is thinking using {availableModels.find(m => m.id === selectedModel)?.name}...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Input Area */}
-            <div className="border-t p-6">
-              <div className="space-y-4">
-                {/* File Uploads */}
-                {uploadedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {uploadedFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center space-x-2 bg-muted rounded-lg px-3 py-2"
-                      >
-                        <span className="text-sm">{file.file.name}</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0"
-                          onClick={() => {
-                            setUploadedFiles(prev => prev.filter(f => f.id !== file.id))
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Message Input */}
-                <div className="flex items-end space-x-2">
-                  <div className="flex-1">
-                    <Textarea
-                      ref={textareaRef}
-                      placeholder="Type your message..."
-                      value={currentMessage}
-                      onChange={(e) => setCurrentMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      className="min-h-[44px] max-h-[120px] resize-none"
-                      disabled={isGenerating || isSending}
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isGenerating}
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files || [])
-                        const newFiles = files.map(file => ({
-                          id: Math.random().toString(36).substr(2, 9),
-                          file,
-                          type: 'document' as const
-                        }))
-                        setUploadedFiles(prev => [...prev, ...newFiles])
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleVoiceInput}
-                      disabled={isGenerating}
-                    >
-                      <Mic className={`h-4 w-4 ${isRecording ? 'text-red-500' : ''}`} />
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        console.log('Send button clicked')
-                        handleSendMessage()
-                      }}
-                      disabled={!currentMessage.trim() || isGenerating || isSending}
-                    >
-                      {isSending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
+          {/* Message Input - Always at bottom, centered only for new conversations */}
+          <div className={isNewConversation ? "flex-1 flex items-center justify-center" : ""}>
+            <div className={isNewConversation ? "w-full max-w-4xl px-6" : ""}>
+              <ChatInput
+                currentMessage={currentMessage}
+                setCurrentMessage={setCurrentMessage}
+                isGenerating={isGenerating}
+                isRecording={isRecording}
+                isProcessing={isProcessing}
+                recordingMetrics={recordingMetrics}
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+                availableModels={availableModels}
+                handleSendMessage={handleSendMessage}
+                handleVoiceInput={handleVoiceInput}
+                handleKeyPress={handleKeyPress}
+                placeholder={isNewConversation ? "How may I help you?" : "Ask Qlippy anything..."}
+              />
             </div>
           </div>
-        </SidebarInset>
-      </div>
+                </div>
 
-      {/* Dialogs */}
-      <ConfirmationDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        title="Delete Conversation"
-        description="Are you sure you want to delete this conversation? This action cannot be undone."
-        onConfirm={() => {
-          if (activeConversationId) {
-            handleDeleteConversation(activeConversationId)
-            setShowDeleteDialog(false)
-          }
-        }}
-      />
+        {/* Delete Confirmation Dialog */}
+        <ConfirmationDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={deleteCurrentConversation}
+          title="Delete chat?"
+          description="Are you sure you want to delete this chat?"
+          confirmText="Delete"
+          cancelText="Cancel"
+        />
 
-      <AddSpaceDialog
-        open={showAddSpaceDialog}
-        onOpenChange={setShowAddSpaceDialog}
-        onAddSpace={handleAddSpace}
-      />
+        <AddSpaceDialog
+          open={showAddSpaceDialog}
+          onOpenChange={setShowAddSpaceDialog}
+          onAddSpace={handleAddSpace}
+        />
+      </SidebarInset>
     </SidebarProvider>
   )
 } 
