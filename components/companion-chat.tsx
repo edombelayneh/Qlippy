@@ -56,13 +56,13 @@ export function CompanionChat() {
       if (toolResponse) {
         const conversationHistory: Message[] = [
           ...messages.filter(m => m.id !== messageId), // Exclude the placeholder
-          { role: 'user', content: query, id: '' },
           { role: 'assistant', content: JSON.stringify(toolResponse.tool_call), id: '' },
           { role: 'tool' as const, content: JSON.stringify(toolResponse.result), id: '' }
         ];
-        body = JSON.stringify({ query: query, messages: conversationHistory });
+        body = JSON.stringify({ messages: conversationHistory });
       } else {
-        body = JSON.stringify({ query: query });
+        const conversationHistory = messages.filter(m => m.id !== messageId);
+        body = JSON.stringify({ messages: conversationHistory });
       }
 
       const response = await fetch("http://127.0.0.1:8000/api/generate", {
@@ -107,16 +107,38 @@ export function CompanionChat() {
 
   const handleToolCall = async (toolCall: any, originalQuery: string, assistantMessageId: string) => {
     let toolResult;
-    setMessages(prev => prev.map(msg => msg.id === assistantMessageId ? { ...msg, role: 'tool', content: `Using tool: ${toolCall.tool}...` } : msg));
+    
+    // Hide the intermediate tool call message from the user
+    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
 
     if (window.api?.fs && typeof window.api.fs[toolCall.tool as keyof typeof window.api.fs] === 'function') {
         try {
-            toolResult = await (window.api.fs[toolCall.tool as keyof typeof window.api.fs] as any)(toolCall.parameters.path);
+            const toolFn = window.api.fs[toolCall.tool as keyof typeof window.api.fs] as any;
+            let args;
+            if (toolCall.tool === 'searchFiles' || toolCall.tool === 'openApplication') {
+                args = toolCall.parameters;
+            } else {
+                args = toolCall.parameters.path;
+            }
+            toolResult = await toolFn(args);
         } catch (e: any) {
             toolResult = { success: false, error: e.message };
         }
     } else {
         toolResult = { success: false, error: `Unknown tool: ${toolCall.tool}` };
+    }
+
+    if (toolCall.tool === 'openApplication' && toolResult.success) {
+      const finalAnswerId = (Date.now() + 1).toString();
+      const appName = toolCall.parameters.appName;
+      const finalAnswerMessage: Message = { 
+          id: finalAnswerId, 
+          role: 'assistant', 
+          content: `I've opened ${appName} for you.` 
+      };
+      setMessages(prev => [...prev, finalAnswerMessage]);
+      setIsGenerating(false);
+      return;
     }
 
     const finalAnswerId = (Date.now() + 1).toString();

@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('api', {
   fs: {
     listFiles: (path) => ipcRenderer.invoke('fs:listFiles', path),
     openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
+    searchFiles: (params) => ipcRenderer.invoke('fs:searchFiles', params),
+    openApplication: (params) => ipcRenderer.invoke('fs:openApplication', params),
   },
   send: (channel, data) => {
     // Whitelist channels to prevent exposing all of ipcRenderer

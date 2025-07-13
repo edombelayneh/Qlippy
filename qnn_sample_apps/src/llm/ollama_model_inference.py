@@ -56,7 +56,7 @@ class OllamaModelInference():
 You can use the following tools and have complete access to the user's local file system:
 
 **listFiles**
-- Description: Lists files and directories at a given path. Will be called when the user asks to list files in a directory.
+- Description: Lists files and directories at a given path. This tool is for browsing a single directory, NOT for searching for files. To find a file, use the `searchFiles` tool.
 - Parameters:
   - `path` (string, optional): The absolute path of the directory to list. If not provided, it defaults to the user's home directory.
 - Example: `listFiles(path=<path to the directory using double backslashes instead of single backslashes>)`
@@ -67,13 +67,27 @@ You can use the following tools and have complete access to the user's local fil
   - `path` (string, required): The absolute path of the file to open.
 - Example: `openFile(path=<path to file using double backslashes instead of single backslashes>)`
 
+**openApplication**
+- Description: Searches for and opens an application. This will search the entire C: drive for the application and open the first match.
+- Parameters:
+  - `appName` (string, required): The name of the application to open (e.g., "notepad", "chrome.exe").
+- Example: `openApplication(appName="notepad")`
+
+**searchFiles**
+- Description: Searches for a file by name recursively. Will be called when the user asks to search for a file by name. Will search through the entire file system for the file. Will return a list of full paths to the files found.
+- Parameters:
+  - `fileName` (string, required): The name of the file to search for.
+- Example: `searchFiles(fileName="fileName")`
+
 When you need to use a tool, respond with a JSON object in the following format, and nothing else:
+```json
 {{
   "tool": "tool_name",
   "parameters": {{
     "param_name": "param_value"
   }}
 }}
+```
 """
 
     def run_inference(self,
