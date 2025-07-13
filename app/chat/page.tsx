@@ -393,13 +393,75 @@ export default function ChatPage() {
       setIsSending(false)
       setIsGenerating(true)
 
-      // Simulate AI response (replace with actual AI integration)
+      // Simulate AI response with markdown formatting test
       setTimeout(async () => {
-        const selectedModelName = availableModels.find(m => m.id === selectedModel)?.name || 'AI Assistant'
-        const aiResponse = `I understand you said: "${userMessageContent}". This is a simulated response using ${selectedModelName}. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `
+# Markdown Formatting Test
+
+This is a test to showcase the various markdown formatting options available.
+
+## Text Formatting
+
+*This text is italicized.*
+**This text is bold.**
+***This text is both bold and italicized.***
+~This text is strikethrough.~
+
+## Lists
+
+### Unordered List
+- Item 1
+- Item 2
+  - Sub-item 2.1
+  - Sub-item 2.2
+- Item 3
+
+### Ordered List
+1. First item
+2. Second item
+3. Third item
+
+## Code Blocks
+
+### Inline Code
+This is an example of \`inline code\`.
+
+### Code Block
+\`\`\`javascript
+function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+console.log(greet('World'));
+\`\`\`
+
+## Blockquote
+> "The only true wisdom is in knowing you know nothing."
+> - Socrates
+
+## Table
+| Header 1 | Header 2 | Header 3 |
+| :--- | :---: | ---: |
+| Align Left | Align Center | Align Right |
+| Cell 1 | Cell 2 | Cell 3 |
+| Cell 4 | Cell 5 | Cell 6 |
+
+## LaTeX Mathematical Expressions
+The quadratic formula is given by: $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$
+
+And here is a block-level LaTeX expression:
+
+$$
+\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}
+$$
+`,
+          timestamp: new Date(),
+        }
         
         // Add AI response to backend
-        await addMessage(conversationId, "assistant", aiResponse)
+        await addMessage(conversationId, "assistant", assistantMessage.content)
         // Force refresh the active conversation to ensure the AI response is visible
         await loadConversation(conversationId)
         console.log('AI response sent successfully')

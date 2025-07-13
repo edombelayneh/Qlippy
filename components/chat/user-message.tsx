@@ -4,6 +4,7 @@ import * as React from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Copy, Pencil } from "lucide-react"
+import { MarkdownRenderer } from "@/components/markdown-renderer"
 
 interface UserMessageProps {
   content: string
@@ -15,7 +16,7 @@ export function UserMessage({ content }: UserMessageProps) {
       <div className="group max-w-[80%]">
         <Card className="bg-muted border-border/50">
           <CardContent className="p-4">
-            <p className="text-sm whitespace-pre-wrap text-foreground">{content}</p>
+            <MarkdownRenderer content={content} />
           </CardContent>
         </Card>
         

@@ -286,3 +286,51 @@ html.starry {
     color-scheme: dark;
   }
 }
+
+@layer components {
+  .prose {
+    h1, h2, h3, h4, h5, h6 { @apply font-semibold; }
+    h1 { @apply text-3xl; }
+    h2 { @apply text-2xl; }
+    h3 { @apply text-xl; }
+    
+    p, ul, ol, blockquote, table {
+      @apply my-4;
+    }
+
+    ul, ol {
+      @apply pl-6;
+    }
+    ul {
+      @apply list-disc;
+    }
+    ol {
+      @apply list-decimal;
+    }
+
+    li > ul, li > ol {
+      @apply my-2;
+    }
+
+    table {
+      @apply w-full border-collapse;
+    }
+    th, td {
+      @apply border border-border px-4 py-2 text-left;
+    }
+    th {
+      @apply font-semibold bg-muted/50;
+    }
+    blockquote {
+      @apply border-l-4 border-border pl-4 italic text-muted-foreground;
+    }
+    
+    code {
+      @apply px-1 py-0.5 bg-muted rounded-sm text-sm font-mono;
+    }
+    
+    pre > code {
+      @apply p-0 bg-transparent;
+    }
+  }
+}

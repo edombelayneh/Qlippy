@@ -3,19 +3,22 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { ThumbsUp, ThumbsDown, Copy, RotateCcw, Share } from "lucide-react"
+import { MarkdownRenderer } from "@/components/markdown-renderer"
+import { toast } from "sonner"
 
 interface AssistantMessageProps {
   content: string
 }
 
 export function AssistantMessage({ content }: AssistantMessageProps) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(content)
+    toast.success("Copied to clipboard")
+  }
+
   return (
     <div className="space-y-3">
-      <div className="prose prose-sm max-w-none">
-        <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-          {content}
-        </p>
-      </div>
+      <MarkdownRenderer content={content} />
       
       {/* Action Buttons */}
       <div className="flex items-center gap-1">
@@ -39,7 +42,7 @@ export function AssistantMessage({ content }: AssistantMessageProps) {
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0 hover:bg-accent text-muted-foreground hover:text-foreground"
-          onClick={() => navigator.clipboard.writeText(content)}
+          onClick={handleCopy}
         >
           <Copy className="h-4 w-4" />
         </Button>
