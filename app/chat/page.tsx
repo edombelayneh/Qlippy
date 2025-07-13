@@ -216,17 +216,25 @@ export default function ChatPage() {
   ])
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId)
-  const messagesEndRef = React.useRef<HTMLDivElement>(null)
+  const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
   React.useEffect(() => {
-    scrollToBottom()
-  }, [activeConversation?.messages])
+    if (scrollAreaRef.current) {
+      const { scrollHeight, clientHeight, scrollTop } = scrollAreaRef.current;
+      // Check if user is near the bottom of the chat before new message comes in
+      const isAtBottom = scrollHeight - clientHeight <= scrollTop + 100; // 100px threshold
+
+      if (isAtBottom || isGenerating) {
+        scrollAreaRef.current.scrollTo({
+          top: scrollHeight,
+          behavior: 'smooth',
+        });
+      }
+    }
+  }, [activeConversation?.messages, isGenerating]);
+
 
   // Auto-resize textarea with max height constraint
   React.useEffect(() => {
@@ -590,7 +598,7 @@ export default function ChatPage() {
 
           {/* Chat Messages */}
           <div className="flex-1 min-h-0">
-            <ScrollArea className="h-full">
+            <ScrollArea className="h-full" ref={scrollAreaRef}>
               <div className="space-y-6 max-w-4xl mx-auto p-4 pb-6">
                 {activeConversation?.messages.map((message) => (
                   <div key={message.id} className="space-y-3">
@@ -719,7 +727,7 @@ export default function ChatPage() {
                     </div>
                   </div>
                 )}
-                <div ref={messagesEndRef} />
+                <div />
               </div>
             </ScrollArea>
           </div>
