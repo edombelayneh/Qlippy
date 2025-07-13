@@ -6,9 +6,8 @@ interface UseConversationsReturn {
   activeConversation: Conversation | null;
   loading: boolean;
   error: string | null;
-  currentUserId: string | null;
-  loadConversations: (userId: string) => Promise<void>;
-  createConversation: (userId: string, title?: string, folder?: string) => Promise<Conversation>;
+  loadConversations: () => Promise<void>;
+  createConversation: (title?: string, folder?: string) => Promise<Conversation>;
   loadConversation: (conversationId: string) => Promise<void>;
   addMessage: (conversationId: string, role: 'user' | 'assistant', content: string) => Promise<Message>;
   updateConversation: (conversationId: string, updates: { title?: string; folder?: string }) => Promise<void>;
@@ -22,22 +21,20 @@ export function useConversations(): UseConversationsReturn {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const loadingRef = useRef(false);
 
-  const loadConversations = useCallback(async (userId: string) => {
+  const loadConversations = useCallback(async () => {
     // Prevent multiple simultaneous calls
     if (loadingRef.current) return;
     
-    console.log('Loading conversations for user:', userId);
+    console.log('Loading conversations...');
     setLoading(true);
     setError(null);
-    setCurrentUserId(userId);
     loadingRef.current = true;
     
     try {
       console.log('Calling qlippyAPI.getConversations...');
-      const conversationsData = await qlippyAPI.getConversations(userId);
+      const conversationsData = await qlippyAPI.getConversations();
       console.log('Loaded conversations:', conversationsData.length, conversationsData);
       setConversations(conversationsData);
     } catch (err) {
@@ -51,7 +48,6 @@ export function useConversations(): UseConversationsReturn {
   }, []);
 
   const createConversation = useCallback(async (
-    userId: string,
     title: string = 'New Conversation',
     folder?: string
   ): Promise<Conversation> => {
@@ -59,7 +55,7 @@ export function useConversations(): UseConversationsReturn {
     setError(null);
     
     try {
-      const newConversation = await qlippyAPI.createConversation(userId, title, folder);
+      const newConversation = await qlippyAPI.createConversation(title, folder);
       setConversations(prev => [newConversation, ...prev]);
       setActiveConversation(newConversation);
       return newConversation;
@@ -183,17 +179,14 @@ export function useConversations(): UseConversationsReturn {
   }, [activeConversation]);
 
   const refreshConversations = useCallback(async () => {
-    if (currentUserId) {
-      await loadConversations(currentUserId);
-    }
-  }, [currentUserId, loadConversations]);
+    await loadConversations();
+  }, [loadConversations]);
 
   return {
     conversations,
     activeConversation,
     loading,
     error,
-    currentUserId,
     loadConversations,
     createConversation,
     loadConversation,

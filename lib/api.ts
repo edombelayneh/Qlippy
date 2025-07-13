@@ -3,13 +3,6 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
-export interface User {
-  id: string;
-  username: string;
-  created_at: string;
-  conversation_count: number;
-}
-
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -25,7 +18,6 @@ export interface Conversation {
   last_updated: string;
   created_at: string;
   message_count: number;
-  user_id: string;
   messages?: Message[];
   last_message_preview?: string;
   matching_messages?: {
@@ -50,7 +42,6 @@ export interface Plugin {
   description: string;
   enabled: boolean;
   created_at: string;
-  user_id: string;
 }
 
 class QlippyAPI {
@@ -93,32 +84,19 @@ class QlippyAPI {
     return this.request('/health');
   }
 
-  // User management
-  async createUser(username: string): Promise<User> {
-    return this.request('/users', {
-      method: 'POST',
-      body: JSON.stringify({ username }),
-    });
-  }
-
-  async getUser(userId: string): Promise<User> {
-    return this.request(`/users/${userId}`);
-  }
-
   // Conversation management
-  async getConversations(userId: string): Promise<Conversation[]> {
-    return this.request(`/users/${userId}/conversations`);
+  async getConversations(): Promise<Conversation[]> {
+    return this.request('/conversations');
   }
 
   async createConversation(
-    userId: string,
     title: string = 'New Conversation',
     folder?: string
   ): Promise<Conversation> {
     const data: any = { title };
     if (folder) data.folder = folder;
 
-    return this.request(`/users/${userId}/conversations`, {
+    return this.request('/conversations', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -170,17 +148,16 @@ class QlippyAPI {
   }
 
   // Plugin management
-  async getPlugins(userId: string): Promise<Plugin[]> {
-    return this.request(`/users/${userId}/plugins`);
+  async getPlugins(): Promise<Plugin[]> {
+    return this.request('/plugins');
   }
 
   async createPlugin(
-    userId: string,
     name: string,
     description: string = '',
     enabled: boolean = true
   ): Promise<Plugin> {
-    return this.request(`/users/${userId}/plugins`, {
+    return this.request('/plugins', {
       method: 'POST',
       body: JSON.stringify({ name, description, enabled }),
     });
@@ -203,8 +180,8 @@ class QlippyAPI {
   }
 
   // Search functionality
-  async searchConversations(userId: string, query: string): Promise<SearchResult> {
-    return this.request(`/users/${userId}/search?q=${encodeURIComponent(query)}`);
+  async searchConversations(query: string): Promise<SearchResult> {
+    return this.request(`/search?q=${encodeURIComponent(query)}`);
   }
 }
 
