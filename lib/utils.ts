@@ -76,9 +76,28 @@ export async function speakText(text: string): Promise<void> {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const data = await response.json();
+    if (data.status === 'error') {
+      throw new Error(data.message || 'Speech failed');
+    }
   } catch (error) {
     console.error('Error calling speak API:', error);
     throw error;
+  }
+}
+
+export async function getSpeechStatus(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/speak');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.is_speaking;
+  } catch (error) {
+    console.error('Error getting speech status:', error);
+    return false;
   }
 }
 
@@ -94,6 +113,11 @@ export async function stopSpeaking(): Promise<void> {
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.status === 'error') {
+      throw new Error(data.message || 'Failed to stop speech');
     }
   } catch (error) {
     console.error('Error stopping speech:', error);

@@ -27,7 +27,7 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { generateLLMStreamResponse, speakText, stopSpeaking } from "@/lib/utils"
+import { generateLLMStreamResponse, speakText, stopSpeaking, getSpeechStatus } from "@/lib/utils"
 
 interface Message {
   id: string
@@ -93,7 +93,7 @@ export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = React.useState("1")
   const [currentMessage, setCurrentMessage] = React.useState("")
   const [isGenerating, setIsGenerating] = React.useState(false)
-  const [selectedModel, setSelectedModel] = React.useState("gpt-4")
+  const [selectedModel, setSelectedModel] = React.useState("mistral7b")
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [uploadedFiles, setUploadedFiles] = React.useState<UploadedFile[]>([])
 
@@ -120,25 +120,10 @@ export default function ChatPage() {
 
   const [availableModels] = React.useState<AIModel[]>([
     {
-      id: "gpt-4",
-      name: "GPT-4",
-      description: "Most capable model, best for complex tasks"
+      id: "mistral7b",
+      name: "Mistral 7B",
+      description: "Le Chat de Mistral"
     },
-    {
-      id: "gpt-3.5-turbo",
-      name: "GPT-3.5 Turbo",
-      description: "Fast and efficient for most tasks"
-    },
-    {
-      id: "claude-3",
-      name: "Claude 3",
-      description: "Excellent for analysis and reasoning"
-    },
-    {
-      id: "llama-2",
-      name: "Llama 2",
-      description: "Open source alternative"
-    }
   ])
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId)
@@ -470,31 +455,34 @@ export default function ChatPage() {
   const currentModel = availableModels.find(m => m.id === selectedModel)
 
   const handleSpeakClick = async (message: Message) => {
+    console.log('handleSpeakClick called for message:', message.id, 'isSpeaking:', message.isSpeaking);
+    
     try {
-      // If already speaking, stop it
+      // If already speaking, stop it immediately
       if (message.isSpeaking) {
+        console.log('Stopping speech for message:', message.id);
         await stopSpeaking();
-        // Add delay before updating UI
-        setTimeout(() => {
-          setConversations(prev =>
-            prev.map(conv =>
-              conv.id === activeConversationId
-                ? {
-                    ...conv,
-                    messages: conv.messages.map(msg =>
-                      msg.id === message.id
-                        ? { ...msg, isSpeaking: false }
-                        : msg
-                    ),
-                  }
-                : conv
-            )
-          );
-        }, 5000); // 5 second delay
+        // Immediately update UI to show stopped state
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === activeConversationId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map(msg =>
+                    msg.id === message.id
+                      ? { ...msg, isSpeaking: false }
+                      : msg
+                  ),
+                }
+              : conv
+          )
+        );
+        console.log('Speech stopped, UI updated');
         return;
       }
 
-      // Stop any other currently speaking message
+      // Stop any other currently speaking message first
+      console.log('Stopping any other speaking messages');
       setConversations(prev =>
         prev.map(conv => ({
           ...conv,
@@ -506,6 +494,7 @@ export default function ChatPage() {
       );
 
       // Start speaking this message
+      console.log('Starting speech for message:', message.id);
       setConversations(prev =>
         prev.map(conv =>
           conv.id === activeConversationId
@@ -521,44 +510,57 @@ export default function ChatPage() {
         )
       );
 
+      // Start the TTS (this returns immediately)
       await speakText(message.content);
+      console.log('Speech started for message:', message.id);
 
-      // After speaking is done, update the state with delay
-      setTimeout(() => {
-        setConversations(prev =>
-          prev.map(conv =>
-            conv.id === activeConversationId
-              ? {
-                  ...conv,
-                  messages: conv.messages.map(msg =>
-                    msg.id === message.id
-                      ? { ...msg, isSpeaking: false }
-                      : msg
-                  ),
-                }
-              : conv
-          )
-        );
-      }, 8000);
-    } catch (error) {
-      console.error('Error in speak click:', error);
-      // Reset speaking state on error with delay
-      setTimeout(() => {
-        setConversations(prev =>
-          prev.map(conv =>
-            conv.id === activeConversationId
-              ? {
-                  ...conv,
-                  messages: conv.messages.map(msg =>
-                    msg.id === message.id
-                      ? { ...msg, isSpeaking: false }
-                      : msg
+      // Poll for speech completion
+      const pollSpeechStatus = async () => {
+        const isStillSpeaking = await getSpeechStatus();
+        if (!isStillSpeaking) {
+          // Speech has completed, update UI
+          setConversations(prev =>
+            prev.map(conv =>
+              conv.id === activeConversationId
+                ? {
+                    ...conv,
+                    messages: conv.messages.map(msg =>
+                      msg.id === message.id
+                        ? { ...msg, isSpeaking: false }
+                        : msg
                     ),
                   }
                 : conv
             )
-        );
-      });
+          );
+          console.log('Speech completed, UI updated');
+        } else {
+          // Still speaking, check again in 500ms
+          setTimeout(pollSpeechStatus, 500);
+        }
+      };
+
+      // Start polling after a short delay
+      setTimeout(pollSpeechStatus, 500);
+      
+    } catch (error) {
+      console.error('Error in speak click:', error);
+      // Reset speaking state on error
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === activeConversationId
+            ? {
+                ...conv,
+                messages: conv.messages.map(msg =>
+                  msg.id === message.id
+                    ? { ...msg, isSpeaking: false }
+                    : msg
+                ),
+              }
+            : conv
+        )
+      );
+      console.log('Error state reset for message:', message.id);
     }
   };
 
