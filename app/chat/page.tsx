@@ -10,6 +10,7 @@ import {
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useConversations } from "@/hooks/use-conversations"
+import { useSpaces } from "@/hooks/use-spaces"
 import { qlippyAPI, Message as APIMessage, Conversation as APIConversation } from "@/lib/api"
 import { AppSidebar } from "@/components/app-sidebar"
 import { AddSpaceDialog } from "@/components/add-space-dialog"
@@ -33,6 +34,13 @@ export default function ChatPage() {
     setActiveConversation,
   } = useConversations()
 
+  const {
+    spaces,
+    loading: spacesLoading,
+    error: spacesError,
+    createSpace,
+  } = useSpaces()
+
   const [isLoading, setIsLoading] = React.useState(true)
   const [activeConversationId, setActiveConversationId] = React.useState<string | null>(null)
   const [currentMessage, setCurrentMessage] = React.useState("")
@@ -50,12 +58,7 @@ export default function ChatPage() {
   const [editingConversationId, setEditingConversationId] = React.useState<string | null>(null)
   const [showAddSpaceDialog, setShowAddSpaceDialog] = React.useState(false)
   const [selectedSpaceForNewConversation, setSelectedSpaceForNewConversation] = React.useState<string | null>(null)
-  const [spaces, setSpaces] = React.useState<Space[]>([
-    { id: "work", name: "Work", icon: "💼", color: "blue", conversationCount: 0 },
-    { id: "personal", name: "Personal", icon: "👤", color: "green", conversationCount: 0 },
-    { id: "side-projects", name: "Side Projects", icon: "🚀", color: "purple", conversationCount: 0 },
-    { id: "hobbies", name: "Hobbies", icon: "🎨", color: "orange", conversationCount: 0 },
-  ])
+
   const [selectedSpace, setSelectedSpace] = React.useState<string | null>(null)
   const hasSetInitialConversation = React.useRef(false)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
@@ -169,8 +172,8 @@ export default function ChatPage() {
       const count = apiConversations.filter(conv => conv.folder === space.id).length
       return { ...space, conversationCount: count }
     })
-    setSpaces(updatedSpaces)
-  }, [apiConversations])
+    // Note: We don't need to setSpaces here since the hook manages the state
+  }, [apiConversations, spaces])
 
   const currentConversation = conversations.find((c) => c.id === activeConversationId)
   
@@ -535,16 +538,14 @@ $$
     }
   }
 
-  const handleAddSpace = (newSpace: { name: string; icon: string; color: string }) => {
-    const newSpaceWithId: Space = {
-      id: `space-${Date.now()}`, // Generate a unique ID
-      name: newSpace.name,
-      icon: newSpace.icon,
-      color: newSpace.color,
-      conversationCount: 0
+  const handleAddSpace = async (newSpace: { name: string; icon: string; color: string }) => {
+    try {
+      await createSpace(newSpace.name, newSpace.icon, newSpace.color)
+      setShowAddSpaceDialog(false)
+    } catch (error) {
+      console.error('Failed to create space:', error)
+      // You might want to show a toast notification here
     }
-    setSpaces(prev => [...prev, newSpaceWithId])
-    setShowAddSpaceDialog(false)
   }
 
   // Show loading while app is initializing

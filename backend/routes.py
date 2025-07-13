@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
-from models import db, Conversation, Message, Plugin
+from models import db, Conversation, Message, Plugin, Space
 
 api = Blueprint('api', __name__)
 
@@ -263,6 +263,67 @@ def search_conversations():
         'results': conversations,
         'total_results': len(conversations)
     })
+
+# Space routes
+@api.route('/spaces', methods=['GET'])
+def get_spaces():
+    spaces = Space.query.all()
+    return jsonify([space.to_dict() for space in spaces])
+
+@api.route('/spaces', methods=['POST'])
+def create_space():
+    data = request.get_json()
+    name = data.get('name')
+    icon = data.get('icon', '👤')
+    color = data.get('color', 'blue')
+    
+    if not name:
+        return jsonify({'error': 'Space name is required'}), 400
+    
+    space = Space(
+        name=name,
+        icon=icon,
+        color=color
+    )
+    
+    db.session.add(space)
+    db.session.commit()
+    
+    return jsonify(space.to_dict()), 201
+
+@api.route('/spaces/<space_id>', methods=['PUT'])
+def update_space(space_id):
+    space = Space.query.get(space_id)
+    if not space:
+        return jsonify({'error': 'Space not found'}), 404
+    
+    data = request.get_json()
+    if 'name' in data:
+        space.name = data['name']
+    if 'icon' in data:
+        space.icon = data['icon']
+    if 'color' in data:
+        space.color = data['color']
+    
+    db.session.commit()
+    
+    return jsonify(space.to_dict())
+
+@api.route('/spaces/<space_id>', methods=['DELETE'])
+def delete_space(space_id):
+    space = Space.query.get(space_id)
+    if not space:
+        return jsonify({'error': 'Space not found'}), 404
+    
+    # Check if any conversations are using this space
+    conversations_using_space = Conversation.query.filter_by(folder=space_id).count()
+    if conversations_using_space > 0:
+        return jsonify({'error': f'Cannot delete space. {conversations_using_space} conversation(s) are using this space.'}), 400
+    
+    db.session.delete(space)
+    db.session.commit()
+    
+    return jsonify({'message': 'Space deleted successfully'})
 
 # Health check
 @api.route('/health', methods=['GET'])

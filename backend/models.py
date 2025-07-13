@@ -4,6 +4,24 @@ import uuid
 
 db = SQLAlchemy()
 
+class Space(db.Model):
+    __tablename__ = 'spaces'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(100), nullable=False)
+    icon = db.Column(db.String(10), nullable=False)
+    color = db.Column(db.String(50), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'icon': self.icon,
+            'color': self.color,
+            'created_at': self.created_at.isoformat()
+        }
+
 class Conversation(db.Model):
     __tablename__ = 'conversations'
     

@@ -51,7 +51,7 @@ export default function SearchPage() {
   })
 
   // Debounced search
-  const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
 
   const performSearch = React.useCallback(async (query: string) => {
     if (!query.trim()) {
