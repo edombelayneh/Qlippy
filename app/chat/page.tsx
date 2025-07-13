@@ -340,9 +340,33 @@ export default function ChatPage() {
   ) => {
     let fullResponse = "";
     try {
-      const body = toolResponse 
-        ? JSON.stringify({ query: query, tool_response: toolResponse }) 
-        : JSON.stringify({ query: query });
+      let body;
+      if (toolResponse) {
+        // Construct the message history for the second turn
+        const messages: Message[] = [
+          { role: 'user', content: query, id: '', timestamp: new Date() }, // Original user query
+          { 
+            role: 'assistant', 
+            // The content here is the raw JSON string for the tool call
+            content: JSON.stringify(toolResponse.tool_call), 
+            id: '', 
+            timestamp: new Date() 
+          },
+          { 
+            role: 'tool' as const, 
+            // The content for the tool role is the result of the tool execution
+            content: JSON.stringify(toolResponse.result),
+            id: '',
+            timestamp: new Date()
+          }
+        ];
+        // The query in the body is still useful for context, but messages contains the ground truth
+        body = JSON.stringify({ query: query, messages: messages });
+      } else {
+        // First turn, just send the query
+        body = JSON.stringify({ query: query });
+      }
+
 
       const response = await fetch("http://127.0.0.1:8000/api/generate", {
         method: "POST",
@@ -389,10 +413,19 @@ export default function ChatPage() {
 
       if (jsonMatch) {
         try {
-          const parsedResponse = JSON.parse(jsonMatch[0]);
+          let parsedResponse = JSON.parse(jsonMatch[0]);
+
+          // Normalize response keys: some models use "function"/"params" instead of "tool"/"parameters"
+          if (parsedResponse.function && parsedResponse.params) {
+            parsedResponse = {
+              tool: parsedResponse.function,
+              parameters: parsedResponse.params,
+            };
+          }
+
           if (parsedResponse.tool && parsedResponse.parameters) {
             // It's a tool call. The text part before the JSON will be discarded.
-            await handleToolCall(parsedResponse.tool, parsedResponse.parameters, query, conversationId, messageId);
+            await handleToolCall(parsedResponse, query, conversationId, messageId);
             return; // Exit, as handleToolCall will continue the flow.
           }
         } catch (e) {
@@ -425,7 +458,7 @@ export default function ChatPage() {
     // The `finally` block was removed for clearer state management.
   }
 
-  const handleToolCall = async (toolName: string, params: any, originalQuery: string, conversationId: string, assistantMessageId: string) => {
+  const handleToolCall = async (toolCall: any, originalQuery: string, conversationId: string, assistantMessageId: string) => {
     let toolResult: any;
 
     // Update the original assistant message to show the tool is being used.
@@ -438,18 +471,18 @@ export default function ChatPage() {
                 ? { 
                     ...msg, 
                     role: 'tool' as const,
-                    content: `Using tool: ${toolName}(${params.path ? `path="${params.path}"` : ''})`,
-                    tool_call: { name: toolName, params: params }
+                    content: `Using tool: ${toolCall.tool}(${toolCall.parameters.path ? `path="${toolCall.parameters.path}"` : ''})`,
+                    tool_call: { name: toolCall.tool, params: toolCall.parameters }
                   } 
                 : msg
             ),
         };
     }));
 
-    if (toolName === 'listFiles') {
+    if (toolCall.tool === 'listFiles') {
       try {
         if (window.api && window.api.fs) {
-          const result = await window.api.fs.listFiles(params.path);
+          const result = await window.api.fs.listFiles(toolCall.parameters.path);
           toolResult = result;
         } else {
           throw new Error("File system API not available.");
@@ -457,10 +490,10 @@ export default function ChatPage() {
       } catch (error: any) {
         toolResult = { success: false, error: error.message };
       }
-    } else if (toolName === 'openFile') {
+    } else if (toolCall.tool === 'openFile') {
       try {
         if (window.api && window.api.fs) {
-          const result = await window.api.fs.openFile(params.path);
+          const result = await window.api.fs.openFile(toolCall.parameters.path);
           toolResult = result;
         } else {
           throw new Error("File system API not available.");
@@ -469,7 +502,7 @@ export default function ChatPage() {
         toolResult = { success: false, error: error.message };
       }
     } else {
-      toolResult = { success: false, error: `Unknown tool: ${toolName}` };
+      toolResult = { success: false, error: `Unknown tool: ${toolCall.tool}` };
     }
 
     // Create a new placeholder for the final answer.
@@ -488,7 +521,10 @@ export default function ChatPage() {
     ));
 
     // Send the result back to the LLM and stream into the new placeholder.
-    await fetchAndProcessLLMResponse(originalQuery, conversationId, finalAnswerMessageId, toolResult);
+    await fetchAndProcessLLMResponse(originalQuery, conversationId, finalAnswerMessageId, {
+      tool_call: toolCall,
+      result: toolResult
+    });
   };
 
 

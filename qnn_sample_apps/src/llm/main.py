@@ -16,11 +16,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, List, Dict
 import asyncio
 
-from model_loader import ModelLoader
-from gemma_model_inference import GemmaModelInference
+# from model_loader import ModelLoader # No longer needed
+# from gemma_model_inference import GemmaModelInference # No longer needed
+from ollama_model_inference import OllamaModelInference, Message # Import Message type
 
 # --- Globals for holding models ---
 models = {}
@@ -33,46 +34,29 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # --- Model Loading on Startup ---
-def load_gemma_model():
-    """Loads the Gemma model and tokenizer and stores them in the global 'models' dict."""
-    logger.info("Loading Gemma model...")
+def load_inference_model():
+    """Loads the Ollama model and stores it in the global 'models' dict."""
+    logger.info("Loading Ollama model...")
     try:
-        # These values can be changed to load different model versions or use different processors
-        model_name = "gemma-3_1b"
-        processor = "cpu"
-        model_type = "default"
+        # This should match the model you have downloaded with `ollama pull`
+        model_name = "llama3.1:8b" 
         
-        iLoad = ModelLoader(model=model_name, processor=processor, model_type=model_type)
-        model_subdirectory = iLoad.model_subdirectory_path
-        graphs = iLoad.graphs
-        
-        model_sessions = {graph_name: iLoad.load_model(graph) for graph_name, graph in graphs.items() if str(graph).endswith(".onnx")}
-        tokenizer = next((file for file in graphs.values() if file.endswith("tokenizer.json")), None)
-        meta_data = graphs["META_DATA"]
+        iInfer = OllamaModelInference(model_name=model_name)
 
-        if not model_sessions or not tokenizer or not meta_data:
-            raise RuntimeError("Failed to load one or more Gemma model components (sessions, tokenizer, metadata).")
-
-        iInfer = GemmaModelInference(
-            model_sessions=model_sessions,
-            tokenizer=tokenizer,
-            model_subdirectory=model_subdirectory,
-            model_meta=meta_data
-        )
-        models['gemma'] = iInfer
-        logger.info("Gemma model loaded successfully.")
+        models['ollama'] = iInfer
+        logger.info(f"Ollama model '{model_name}' loaded successfully.")
     except Exception as e:
-        logger.error(f"FATAL: Could not load Gemma model on startup: {e}")
+        logger.error(f"FATAL: Could not load Ollama model on startup: {e}")
         # In a real app, you might want to exit if the model fails to load.
         # For now, we'll log the error and the app will start, but endpoints will fail.
-        models['gemma'] = None
+        models['ollama'] = None
 
 
 # --- FastAPI Lifespan Management ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the model during startup
-    load_gemma_model()
+    load_inference_model()
     yield
     # Clean up resources if needed on shutdown
     models.clear()
@@ -95,44 +79,43 @@ app.add_middleware(
 
 # --- Pydantic Request Models ---
 class GenerateRequest(BaseModel):
-    query: str
+    query: str # The most recent user query
+    messages: Optional[List[Message]] = None # The entire conversation history
     persona: Optional[str] = None
-    tool_response: Optional[dict] = None
     max_tokens: int = 4096
     temperature: float = 0.6
     top_k: int = 10
-    repetition_penalty: Optional[float] = 1.1
+    # repetition_penalty is not used by the new Ollama implementation.
 
 # --- API Endpoints ---
 @app.get("/health")
 def health_check():
     """A simple endpoint to confirm the server is running."""
-    return {"status": "ok", "gemma_model_loaded": models.get('gemma') is not None}
+    return {"status": "ok", "ollama_model_loaded": models.get('ollama') is not None}
 
 @app.post("/api/generate")
 async def generate_text(request: GenerateRequest):
     """
-    Generates text using the pre-loaded Gemma model and streams the response.
+    Generates text using the pre-loaded Ollama model and streams the response.
     """
     logger.info(f"Received generation request with query: '{request.query}'")
     
-    gemma_inference_instance = models.get('gemma')
+    inference_instance = models.get('ollama')
 
-    if gemma_inference_instance is None:
-        logger.error("Gemma model is not available. Cannot process request.")
+    if inference_instance is None:
+        logger.error("Ollama model is not available. Cannot process request.")
         raise HTTPException(status_code=503, detail="Model is not loaded. Please check server logs.")
 
     async def stream_generation() -> AsyncGenerator[str, None]:
         try:
-            # The run_inference method is now a generator
-            for chunk in gemma_inference_instance.run_inference(
+            # The run_inference method is a generator
+            for chunk in inference_instance.run_inference(
                 query=request.query,
+                messages=request.messages,
                 top_k=request.top_k,
                 temperature=request.temperature,
                 persona=request.persona,
                 max_tokens=request.max_tokens,
-                repetition_penalty=request.repetition_penalty,
-                tool_response=request.tool_response
             ):
                 yield chunk
                 await asyncio.sleep(0) # Yield control to the event loop
