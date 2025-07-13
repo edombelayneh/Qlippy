@@ -8,7 +8,7 @@ const { registerFileSystemHandlers } = require('./backend/file-system-handler.js
 // const accessKey = "eDGFUBlFfqwPu09E2Umkne947P+RobsTREdrWjsERC61iYgk16vy7w==";
 
 let mainWindow;
-let avatarWindow;
+let companionWindow;
 
 function createMainWindow() {
   if (mainWindow) {
@@ -40,31 +40,30 @@ function createMainWindow() {
   });
 }
 
-function createAvatarWindow() {
+function createCompanionWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  avatarWindow = new BrowserWindow({
-    width: 200,
-    height: 250,
-    x: width - 210,
-    y: height - 260,
+  companionWindow = new BrowserWindow({
+    width: 384, // 96 * 4
+    height: 640, // More height for a chat UI
+    x: width - 400,
+    y: height - 680,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     show: false,
     resizable: false,
-    focusable: true, // Ensure the window can receive focus
-    titleBarStyle: 'hidden', // This is the key setting for frameless windows
+    focusable: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
-      contextIsolation: false,
+      // contextIsolation should be true for security, and we can use the preload script
+      contextIsolation: true, 
     },
   });
 
-  avatarWindow.loadFile(path.join(__dirname, "index.html"));
+  companionWindow.loadURL("http://localhost:3000/companion");
 
-  avatarWindow.on("closed", () => {
-    avatarWindow = null;
+  companionWindow.on("closed", () => {
+    companionWindow = null;
   });
 }
 
@@ -85,9 +84,9 @@ function createAvatarWindow() {
 //       const keywordIndex = porcupine.process(pcm);
 //       if (keywordIndex !== -1) {
 //         console.log('"Hey Qlippy" detected!');
-//         if (avatarWindow) {
-//           avatarWindow.show();
-//           avatarWindow.focus();
+//         if (companionWindow) {
+//           companionWindow.show();
+//           companionWindow.focus();
 //         }
 //       }
 //     }, 10);
@@ -111,11 +110,11 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
-    createAvatarWindow();
-    // For testing, show the avatar window immediately since hotword is disabled.
-    if (avatarWindow) {
-      avatarWindow.show();
-      avatarWindow.focus(); // Force focus after showing
+    createCompanionWindow();
+    // For testing, show the companion window immediately
+    if (companionWindow) {
+      companionWindow.show();
+      companionWindow.focus();
     }
     // startHotwordDetection();
     registerFileSystemHandlers(ipcMain, shell);
@@ -136,17 +135,32 @@ app.on("activate", () => {
   }
 });
 
+ipcMain.on("open-main-from-companion", () => {
+  if (!mainWindow) {
+    createMainWindow();
+  }
+  if (companionWindow) {
+    companionWindow.close();
+  }
+});
+
+ipcMain.on("close-companion-window", () => {
+  if (companionWindow) {
+    companionWindow.close();
+  }
+});
+
 ipcMain.on("open-main-app", () => {
   if (!mainWindow) {
     createMainWindow();
   }
-  if (avatarWindow) {
-    avatarWindow.close();
+  if (companionWindow) {
+    companionWindow.close();
   }
 });
 
 ipcMain.on("close-avatar", () => {
-  if (avatarWindow) {
-    avatarWindow.close();
+  if (companionWindow) {
+    companionWindow.close();
   }
 });

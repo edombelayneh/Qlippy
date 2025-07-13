@@ -286,3 +286,39 @@ html.starry {
     @apply text-sm;
   }
 }
+
+@layer utilities {
+  @keyframes glow {
+    from {
+      filter: drop-shadow(0 0 5px #2d96de);
+    }
+    to {
+      filter: drop-shadow(0 0 20px #2d96de);
+    }
+  }
+
+  .animate-glow {
+    animation: glow 2s infinite alternate;
+  }
+}
+
+@layer components {
+  /* Custom scrollbar for WebKit browsers (Chrome, Safari, Electron) */
+  .subtle-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+ 
+  .subtle-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+ 
+  .subtle-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+ 
+  .subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+  }
+}

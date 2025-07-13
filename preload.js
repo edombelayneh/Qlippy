@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   send: (channel, data) => {
     // Whitelist channels to prevent exposing all of ipcRenderer
-    const validChannels = ['open-main-app', 'close-avatar'];
+    const validChannels = ['open-main-app', 'close-avatar', 'open-main-from-companion', 'close-companion-window'];
     if (validChannels.includes(channel)) {
       ipcRenderer.send(channel, data);
     }
