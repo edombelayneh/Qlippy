@@ -44,6 +44,10 @@ declare global {
           files?: { name: string; isDirectory: boolean; }[]; 
           error?: string; 
         }>;
+        openFile: (path: string) => Promise<{
+          success: boolean;
+          error?: string;
+        }>;
       };
       send: (channel: string, data?: any) => void;
     };
@@ -446,6 +450,17 @@ export default function ChatPage() {
       try {
         if (window.api && window.api.fs) {
           const result = await window.api.fs.listFiles(params.path);
+          toolResult = result;
+        } else {
+          throw new Error("File system API not available.");
+        }
+      } catch (error: any) {
+        toolResult = { success: false, error: error.message };
+      }
+    } else if (toolName === 'openFile') {
+      try {
+        if (window.api && window.api.fs) {
+          const result = await window.api.fs.openFile(params.path);
           toolResult = result;
         } else {
           throw new Error("File system API not available.");

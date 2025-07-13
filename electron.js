@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain } = require("electron");
+const { app, BrowserWindow, screen, ipcMain, shell } = require("electron");
 const path = require("path");
 const { registerFileSystemHandlers } = require('./backend/file-system-handler.js')
 
@@ -118,7 +118,7 @@ if (!gotTheLock) {
       avatarWindow.focus(); // Force focus after showing
     }
     // startHotwordDetection();
-    registerFileSystemHandlers(ipcMain);
+    registerFileSystemHandlers(ipcMain, shell);
   });
 }
 

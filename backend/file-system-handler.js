@@ -2,18 +2,23 @@ const fs = require('fs/promises');
 const os = require('os');
 const path = require('path');
 
-function registerFileSystemHandlers(ipcMain) {
+function registerFileSystemHandlers(ipcMain, shell) {
   ipcMain.handle('fs:listFiles', async (event, dirPath) => {
     try {
       let finalPath = dirPath;
+      const homeDir = os.homedir();
 
       if (!finalPath) {
-        // If no path is provided, default to the user's home directory.
-        finalPath = os.homedir();
+        // Case 1: No path is provided. Default to home directory.
+        finalPath = homeDir;
+      } else if (finalPath.startsWith('~')) {
+        // Case 2: Path starts with a tilde. Expand it.
+        finalPath = path.join(homeDir, finalPath.substring(1));
       } else if (!path.isAbsolute(finalPath)) {
-        // If the provided path is relative, join it with the home directory.
-        finalPath = path.join(os.homedir(), finalPath);
+        // Case 3: Path is relative. Join it with the home directory.
+        finalPath = path.join(homeDir, finalPath);
       }
+      // Case 4: Path is absolute. Use it as is.
 
       const files = await fs.readdir(finalPath, { withFileTypes: true });
       const filesList = files.map(file => ({
@@ -27,9 +32,34 @@ function registerFileSystemHandlers(ipcMain) {
     }
   });
 
-  // We can add more handlers here for other fs operations
-  // ipcMain.handle('fs:readFile', async (event, filePath) => { ... });
-  // ipcMain.handle('fs:writeFile', async (event, filePath, content) => { ... });
+  // Handler for opening a file with the default application
+  ipcMain.handle('fs:openFile', async (event, filePath) => {
+    try {
+      const homeDir = os.homedir();
+      let finalPath = filePath;
+
+      if (!finalPath) {
+        throw new Error('No file path provided');
+      } else if (finalPath.startsWith('~')) {
+        finalPath = path.join(homeDir, finalPath.substring(1));
+      } else if (!path.isAbsolute(finalPath)) {
+        finalPath = path.join(homeDir, finalPath);
+      }
+      
+      // Open the file using the system's shell
+      const errorMessage = await shell.openPath(finalPath);
+      
+      if (errorMessage) {
+        console.error(`Failed to open file '${finalPath}': ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error(`Error opening file '${filePath}':`, error);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 module.exports = {

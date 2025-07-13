@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   fs: {
     listFiles: (path) => ipcRenderer.invoke('fs:listFiles', path),
+    openFile: (path) => ipcRenderer.invoke('fs:openFile', path),
   },
   send: (channel, data) => {
     // Whitelist channels to prevent exposing all of ipcRenderer

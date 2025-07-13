@@ -198,16 +198,22 @@ Based on that, here is the answer:
             user_context_prompt = f"You know the user's home directory is '{escaped_home_dir}'. Use this information when a user asks for files in their home, documents, desktop, etc."
 
         tool_prompt = f"""\
-You are a helpful AI assistant with access to the user's local file system.
+You are a helpful AI assistant that only speaks English with access to the user's local file system.
 {user_context_prompt}
 
-You can use the following tool:
+You can use the following tools:
 
 **listFiles**
 - Description: Lists files and directories at a given path.
 - Parameters:
   - `path` (string, optional): The absolute path of the directory to list. If not provided, it defaults to the user's home directory.
-- Example: `listFiles(path="/Users/username/Documents")`
+- Example: `listFiles(path=<path to the directory>)`
+
+**openFile**
+- Description: Opens a file using the system's default application.
+- Parameters:
+  - `path` (string, required): The absolute path of the file to open.
+- Example: `openFile(path=<path to file>)`
 
 When you need to use a tool, respond with a JSON object in the following format, and nothing else:
 {{
