@@ -44,6 +44,14 @@ export interface Plugin {
   created_at: string;
 }
 
+export interface Space {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  conversationCount?: number;
+}
+
 class QlippyAPI {
   private baseUrl: string;
 
@@ -182,6 +190,38 @@ class QlippyAPI {
   // Search functionality
   async searchConversations(query: string): Promise<SearchResult> {
     return this.request(`/search?q=${encodeURIComponent(query)}`);
+  }
+
+  // Space management
+  async getSpaces(): Promise<Space[]> {
+    return this.request('/spaces');
+  }
+
+  async createSpace(
+    name: string,
+    icon: string = 'folder',
+    color: string = '#3b82f6'
+  ): Promise<Space> {
+    return this.request('/spaces', {
+      method: 'POST',
+      body: JSON.stringify({ name, icon, color }),
+    });
+  }
+
+  async updateSpace(
+    spaceId: string,
+    updates: { name?: string; icon?: string; color?: string }
+  ): Promise<Space> {
+    return this.request(`/spaces/${spaceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteSpace(spaceId: string): Promise<{ message: string }> {
+    return this.request(`/spaces/${spaceId}`, {
+      method: 'DELETE',
+    });
   }
 }
 
