@@ -8,6 +8,7 @@ const fs = require("fs");
 const os = require("os");
 
 const accessKey = process.env.PORCUPINE_ACCESS_KEY || "YOUR_ACCESS_KEY_HERE";
+console.log('🔑 Loaded access key:', accessKey ? accessKey.substring(0, 10) + '...' : 'undefined');
 
 let mainWindow;
 let avatarWindow;
