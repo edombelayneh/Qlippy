@@ -97,6 +97,7 @@ app.add_middleware(
 class GenerateRequest(BaseModel):
     query: str
     persona: Optional[str] = None
+    tool_response: Optional[dict] = None
     max_tokens: int = 4096
     temperature: float = 0.6
     top_k: int = 10
@@ -130,7 +131,8 @@ async def generate_text(request: GenerateRequest):
                 temperature=request.temperature,
                 persona=request.persona,
                 max_tokens=request.max_tokens,
-                repetition_penalty=request.repetition_penalty
+                repetition_penalty=request.repetition_penalty,
+                tool_response=request.tool_response
             ):
                 yield chunk
                 await asyncio.sleep(0) # Yield control to the event loop

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, MoreHorizontal, Edit, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File } from "lucide-react"
+import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, MoreHorizontal, Edit, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File, Terminal } from "lucide-react"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -34,11 +34,32 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
+// Define the API exposed by the preload script
+declare global {
+  interface Window {
+    api: {
+      fs: {
+        listFiles: (path?: string) => Promise<{ 
+          success: boolean; 
+          files?: { name: string; isDirectory: boolean; }[]; 
+          error?: string; 
+        }>;
+      };
+      send: (channel: string, data?: any) => void;
+    };
+  }
+}
+
 interface Message {
   id: string
-  role: "user" | "assistant"
+  role: "user" | "assistant" | "tool"
   content: string
   timestamp: Date
+  tool_call?: {
+    name: string;
+    params: any;
+  }
+  tool_response?: any
 }
 
 interface Conversation {
@@ -76,7 +97,7 @@ export default function ChatPage() {
     // Simulate app initialization
     const timer = setTimeout(() => {
       setIsLoading(false)
-    }, 2000) // Show loader for 2 seconds
+    }, 1000) 
 
     return () => clearTimeout(timer)
   }, [])
@@ -284,10 +305,10 @@ export default function ChatPage() {
 
     const query = currentMessage;
     setCurrentMessage("")
-    setUploadedFiles([]) // Clear uploaded files after sending
+    setUploadedFiles([])
     setIsGenerating(true)
 
-    // --- Streaming API Call ---
+    // Initial call to the LLM
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage: Message = {
       id: assistantMessageId,
@@ -299,22 +320,30 @@ export default function ChatPage() {
     setConversations((prev) =>
       prev.map((conv) =>
         conv.id === activeConversationId
-          ? {
-              ...conv,
-              messages: [...conv.messages, assistantMessage],
-            }
-          : conv,
-      ),
+          ? { ...conv, messages: [...conv.messages, assistantMessage] }
+          : conv
+      )
     );
+    
+    await fetchAndProcessLLMResponse(query, activeConversationId, assistantMessageId);
+  }
 
+  const fetchAndProcessLLMResponse = async (
+    query: string,
+    conversationId: string,
+    messageId: string,
+    toolResponse?: any
+  ) => {
+    let fullResponse = "";
     try {
+      const body = toolResponse 
+        ? JSON.stringify({ query: query, tool_response: toolResponse }) 
+        : JSON.stringify({ query: query });
+
       const response = await fetch("http://127.0.0.1:8000/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: query,
-          // You can pass other parameters here from your state if needed
-        }),
+        body: body,
       });
 
       if (!response.ok || !response.body) {
@@ -331,14 +360,15 @@ export default function ChatPage() {
         const chunk = decoder.decode(value, { stream: !done });
         
         if (chunk) {
+          fullResponse += chunk;
           setConversations((prev) =>
             prev.map((conv) =>
-              conv.id === activeConversationId
+              conv.id === conversationId
                 ? {
                     ...conv,
                     messages: conv.messages.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: msg.content + chunk }
+                      msg.id === messageId
+                        ? { ...msg, content: fullResponse }
                         : msg
                     ),
                     lastUpdated: new Date(),
@@ -348,26 +378,104 @@ export default function ChatPage() {
           );
         }
       }
+
+      // After streaming is complete, check for tool call
+      const jsonRegex = /\{[\s\S]*\}/;
+      const jsonMatch = fullResponse.match(jsonRegex);
+
+      if (jsonMatch) {
+        try {
+          const parsedResponse = JSON.parse(jsonMatch[0]);
+          if (parsedResponse.tool && parsedResponse.parameters) {
+            // It's a tool call. The text part before the JSON will be discarded.
+            await handleToolCall(parsedResponse.tool, parsedResponse.parameters, query, conversationId, messageId);
+            return; // Exit, as handleToolCall will continue the flow.
+          }
+        } catch (e) {
+          // It looked like JSON, but wasn't valid. Treat as a normal text message.
+          console.warn("A JSON-like object was found but failed to parse:", e);
+        }
+      }
+      
+      // If we reach here, it means it's a final response, not a tool call.
+      setIsGenerating(false);
+
     } catch (error) {
       console.error("Failed to fetch from AI service:", error);
       setConversations((prev) =>
         prev.map((conv) =>
-          conv.id === activeConversationId
+          conv.id === conversationId
             ? {
                 ...conv,
                 messages: conv.messages.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: "Sorry, I am unable to connect to the AI service at the moment. Please ensure the Python server is running and refresh." }
+                  msg.id === messageId
+                    ? { ...msg, content: "Sorry, I am unable to connect to the AI service at the moment." }
                     : msg
                 ),
               }
             : conv
         )
       );
-    } finally {
-      setIsGenerating(false);
+      setIsGenerating(false); // Also stop generating on error.
     }
+    // The `finally` block was removed for clearer state management.
   }
+
+  const handleToolCall = async (toolName: string, params: any, originalQuery: string, conversationId: string, assistantMessageId: string) => {
+    let toolResult: any;
+
+    // Update the original assistant message to show the tool is being used.
+    setConversations(prev => prev.map(conv => {
+        if (conv.id !== conversationId) return conv;
+        return {
+            ...conv,
+            messages: conv.messages.map(msg => 
+                msg.id === assistantMessageId 
+                ? { 
+                    ...msg, 
+                    role: 'tool' as const,
+                    content: `Using tool: ${toolName}(${params.path ? `path="${params.path}"` : ''})`,
+                    tool_call: { name: toolName, params: params }
+                  } 
+                : msg
+            ),
+        };
+    }));
+
+    if (toolName === 'listFiles') {
+      try {
+        if (window.api && window.api.fs) {
+          const result = await window.api.fs.listFiles(params.path);
+          toolResult = result;
+        } else {
+          throw new Error("File system API not available.");
+        }
+      } catch (error: any) {
+        toolResult = { success: false, error: error.message };
+      }
+    } else {
+      toolResult = { success: false, error: `Unknown tool: ${toolName}` };
+    }
+
+    // Create a new placeholder for the final answer.
+    const finalAnswerMessageId = (Date.now() + 1).toString();
+    const finalAnswerMessage: Message = {
+        id: finalAnswerMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date()
+    };
+
+    setConversations(prev => prev.map(conv => 
+      conv.id === conversationId 
+        ? { ...conv, messages: [...conv.messages, finalAnswerMessage] }
+        : conv
+    ));
+
+    // Send the result back to the LLM and stream into the new placeholder.
+    await fetchAndProcessLLMResponse(originalQuery, conversationId, finalAnswerMessageId, toolResult);
+  };
+
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -602,7 +710,7 @@ export default function ChatPage() {
               <div className="space-y-6 max-w-4xl mx-auto p-4 pb-6">
                 {activeConversation?.messages.map((message) => (
                   <div key={message.id} className="space-y-3">
-                                      {message.role === "user" ? (
+                    {message.role === "user" ? (
                     // User Message - Card Style with hover actions
                     <div className="flex justify-end">
                       <div className="group max-w-[80%]">
@@ -631,6 +739,18 @@ export default function ChatPage() {
                             <Pencil className="h-4 w-4" />
                           </Button>
                         </div>
+                      </div>
+                    </div>
+                  ) : message.role === "tool" ? (
+                    // Tool Call Message
+                    <div className="flex items-center gap-4 my-4">
+                      <div className="flex-shrink-0">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <Terminal className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {message.content}
                       </div>
                     </div>
                   ) : (

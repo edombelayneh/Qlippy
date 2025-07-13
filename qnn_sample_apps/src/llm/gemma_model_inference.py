@@ -12,6 +12,7 @@ import logging
 import time
 import re
 import sys
+import os
 
 from enum import IntEnum, Enum
 from tokenizers import Tokenizer
@@ -74,15 +75,29 @@ class GemmaModelInference():
 
         # self.verbosity_init(self.verbose)
     
-    def query(self, query: str, system_prompt: Optional[str]=None, persona: Optional[str]=None) -> str:
+    def query(self, query: str, system_prompt: Optional[str]=None, persona: Optional[str]=None, tool_response: Optional[dict]=None, home_directory: Optional[str]=None) -> str:
         
         self.current_query = query
 
-        if system_prompt:
-            formatted_query = self._prompt_template().replace("[system_instruction]",system_prompt)\
+        if tool_response:
+            import json
+            tool_response_str = json.dumps(tool_response, indent=2)
+            # A more robust prompt for the second turn (when a tool result is available)
+            formatted_query = f"""<start_of_turn>user
+I asked: "{query}"
+<end_of_turn>
+<start_of_turn>model
+<tool_code>
+I used the 'listFiles' tool and got this result:
+{tool_response_str}
+</tool_code>
+Based on that, here is the answer:
+"""
+        elif system_prompt:
+            formatted_query = self._prompt_template(home_directory=home_directory).replace("[system_instruction]",system_prompt)\
                                                      .replace("[query]",query)
         else:
-            formatted_query = self._prompt_template().replace("[system_instruction].","")\
+            formatted_query = self._prompt_template(home_directory=home_directory).replace("[system_instruction].","")\
                                                      .replace("[query]",query)
         
         token_ids = self.tokenize(prompt=formatted_query)
@@ -174,11 +189,38 @@ class GemmaModelInference():
     
         logger.info(f"Number of tokens generated: {len(generated_ids)}")
 
-    def _prompt_template(self):
-        return """<start_of_turn>user
-                    [system_instruction]. [query]
-                    <end_of_turn>
-                    <start_of_turn>model"""
+    def _prompt_template(self, home_directory: Optional[str] = None):
+        user_context_prompt = ""
+        if home_directory:
+            # In Windows, paths from os.path.expanduser use backslashes.
+            # We need to escape them for the prompt string.
+            escaped_home_dir = home_directory.replace('\\', '\\\\')
+            user_context_prompt = f"You know the user's home directory is '{escaped_home_dir}'. Use this information when a user asks for files in their home, documents, desktop, etc."
+
+        tool_prompt = f"""\
+You are a helpful AI assistant with access to the user's local file system.
+{user_context_prompt}
+
+You can use the following tool:
+
+**listFiles**
+- Description: Lists files and directories at a given path.
+- Parameters:
+  - `path` (string, optional): The absolute path of the directory to list. If not provided, it defaults to the user's home directory.
+- Example: `listFiles(path="/Users/username/Documents")`
+
+When you need to use a tool, respond with a JSON object in the following format, and nothing else:
+{{
+  "tool": "tool_name",
+  "parameters": {{
+    "param_name": "param_value"
+  }}
+}}
+"""
+        return f"""<start_of_turn>user
+[system_instruction]. {tool_prompt} [query]
+<end_of_turn>
+<start_of_turn>model"""
     
     def run_inference(self, 
                       query: str,
@@ -187,10 +229,19 @@ class GemmaModelInference():
                       persona: Optional[str]=None,
                       max_tokens: int=4096,
                       system_prompt: Optional[str]=None,
+                      tool_response: Optional[dict]=None,
                       io_binding: Optional[bool]=None,
                       repetition_penalty: Optional[float]=None):
         
-        token_ids = self.query(query=query, system_prompt=system_prompt)
+        home_dir = None
+        # We only need the home directory on the first turn (no tool response yet).
+        if not tool_response:
+            try:
+                home_dir = os.path.expanduser('~')
+            except Exception as e:
+                logger.error(f"Could not get user home directory: {e}")
+
+        token_ids = self.query(query=query, system_prompt=system_prompt, tool_response=tool_response, home_directory=home_dir)
         kv_cache = self._cache_init()
         len_token_id = token_ids.shape[-1]
         position_ids = np.array(np.arange(len_token_id, dtype=np.int64))

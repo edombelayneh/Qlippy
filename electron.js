@@ -1,5 +1,7 @@
 const { app, BrowserWindow, screen, ipcMain } = require("electron");
 const path = require("path");
+const { registerFileSystemHandlers } = require('./backend/file-system-handler.js')
+
 // const { Porcupine } = require("@picovoice/porcupine-node");
 // const { PvRecorder } = require("@picovoice/pvrecorder-node");
 
@@ -19,6 +21,7 @@ function createMainWindow() {
     minWidth: 1280,
     minHeight: 800,
     webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
     },
   });
@@ -115,6 +118,7 @@ if (!gotTheLock) {
       avatarWindow.focus(); // Force focus after showing
     }
     // startHotwordDetection();
+    registerFileSystemHandlers(ipcMain);
   });
 }
 
