@@ -25,30 +25,12 @@ def test_health():
         print("❌ Could not connect to server. Make sure the backend is running.")
         return False
 
-def test_user_creation():
-    """Test user creation"""
-    print("\n👤 Testing user creation...")
-    user_data = {"username": "testuser"}
-    try:
-        response = requests.post(f"{BASE_URL}/users", json=user_data)
-        if response.status_code == 201:
-            user = response.json()
-            print(f"✅ User created: {user['username']} (ID: {user['id']})")
-            return user['id']
-        else:
-            print(f"❌ User creation failed: {response.status_code}")
-            print(response.text)
-            return None
-    except Exception as e:
-        print(f"❌ Error creating user: {e}")
-        return None
-
-def test_conversation_creation(user_id):
+def test_conversation_creation():
     """Test conversation creation"""
-    print(f"\n💬 Testing conversation creation for user {user_id}...")
+    print("\n💬 Testing conversation creation...")
     conv_data = {"title": "Test Conversation", "folder": "test"}
     try:
-        response = requests.post(f"{BASE_URL}/users/{user_id}/conversations", json=conv_data)
+        response = requests.post(f"{BASE_URL}/conversations", json=conv_data)
         if response.status_code == 201:
             conversation = response.json()
             print(f"✅ Conversation created: {conversation['title']} (ID: {conversation['id']})")
@@ -113,16 +95,16 @@ def test_conversation_retrieval(conversation_id):
         print(f"❌ Error retrieving conversation: {e}")
         return False
 
-def test_plugin_creation(user_id):
+def test_plugin_creation():
     """Test plugin creation"""
-    print(f"\n🔌 Testing plugin creation for user {user_id}...")
+    print("\n🔌 Testing plugin creation...")
     plugin_data = {
         "name": "Test Plugin",
         "description": "A test plugin for the Qlippy backend",
         "enabled": True
     }
     try:
-        response = requests.post(f"{BASE_URL}/users/{user_id}/plugins", json=plugin_data)
+        response = requests.post(f"{BASE_URL}/plugins", json=plugin_data)
         if response.status_code == 201:
             plugin = response.json()
             print(f"✅ Plugin created: {plugin['name']} (ID: {plugin['id']})")
@@ -135,6 +117,38 @@ def test_plugin_creation(user_id):
         print(f"❌ Error creating plugin: {e}")
         return None
 
+def test_conversations_list():
+    """Test getting all conversations"""
+    print("\n📋 Testing conversations list...")
+    try:
+        response = requests.get(f"{BASE_URL}/conversations")
+        if response.status_code == 200:
+            conversations = response.json()
+            print(f"✅ Retrieved {len(conversations)} conversations")
+            return True
+        else:
+            print(f"❌ Conversations list failed: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Error retrieving conversations: {e}")
+        return False
+
+def test_plugins_list():
+    """Test getting all plugins"""
+    print("\n🔌 Testing plugins list...")
+    try:
+        response = requests.get(f"{BASE_URL}/plugins")
+        if response.status_code == 200:
+            plugins = response.json()
+            print(f"✅ Retrieved {len(plugins)} plugins")
+            return True
+        else:
+            print(f"❌ Plugins list failed: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"❌ Error retrieving plugins: {e}")
+        return False
+
 def main():
     """Run all tests"""
     print("🧪 Starting Qlippy Backend API Tests")
@@ -145,14 +159,8 @@ def main():
         print("\n❌ Health check failed. Exiting.")
         sys.exit(1)
     
-    # Test user creation
-    user_id = test_user_creation()
-    if not user_id:
-        print("\n❌ User creation failed. Exiting.")
-        sys.exit(1)
-    
     # Test conversation creation
-    conversation_id = test_conversation_creation(user_id)
+    conversation_id = test_conversation_creation()
     if not conversation_id:
         print("\n❌ Conversation creation failed. Exiting.")
         sys.exit(1)
@@ -168,15 +176,24 @@ def main():
         sys.exit(1)
     
     # Test plugin creation
-    plugin_id = test_plugin_creation(user_id)
+    plugin_id = test_plugin_creation()
     if not plugin_id:
         print("\n❌ Plugin creation failed. Exiting.")
+        sys.exit(1)
+    
+    # Test conversations list
+    if not test_conversations_list():
+        print("\n❌ Conversations list failed. Exiting.")
+        sys.exit(1)
+    
+    # Test plugins list
+    if not test_plugins_list():
+        print("\n❌ Plugins list failed. Exiting.")
         sys.exit(1)
     
     print("\n" + "=" * 50)
     print("🎉 All tests passed! The backend is working correctly.")
     print(f"📊 Test Summary:")
-    print(f"   - User ID: {user_id}")
     print(f"   - Conversation ID: {conversation_id}")
     print(f"   - Plugin ID: {plugin_id}")
     print(f"   - API Base URL: {BASE_URL}")

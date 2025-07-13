@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/sidebar"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useUserContext } from "@/contexts/user-context"
 import { useConversations } from "@/hooks/use-conversations"
 import { qlippyAPI, Message as APIMessage, Conversation as APIConversation } from "@/lib/api"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -20,7 +19,6 @@ import { MessageList } from "@/components/chat/message-list"
 import { Message, Conversation, Plugin, AIModel, Space, UploadedFile } from "@/lib/types"
 
 export default function ChatPage() {
-  const { user, loading: userLoading, error: userError } = useUserContext()
   const {
     conversations: apiConversations,
     activeConversation,
@@ -33,7 +31,6 @@ export default function ChatPage() {
     updateConversation,
     deleteConversation,
     setActiveConversation,
-    currentUserId,
   } = useConversations()
 
   const [isLoading, setIsLoading] = React.useState(true)
@@ -191,20 +188,17 @@ export default function ChatPage() {
     currentConversationMessages: currentConversation?.messages?.length || 0
   })
 
-  // Load conversations when user is authenticated
+  // Load conversations on component mount
   React.useEffect(() => {
     console.log('useEffect for loading conversations:', {
-      user: !!user,
-      user_id: user?.id,
       conversationsLoading,
-      currentUserId,
-      shouldLoad: user && !conversationsLoading && user.id !== currentUserId
+      shouldLoad: !conversationsLoading
     })
     
-    if (user && !conversationsLoading && user.id !== currentUserId) {
-      loadConversations(user.id)
+    if (!conversationsLoading) {
+      loadConversations()
     }
-  }, [user?.id, conversationsLoading, loadConversations])
+  }, [conversationsLoading, loadConversations])
 
   // Set first conversation as active if none selected
   React.useEffect(() => {
@@ -225,13 +219,11 @@ export default function ChatPage() {
 
   // Initialize app
   React.useEffect(() => {
-    if (!userLoading) {
-      const timer = setTimeout(() => {
-        setIsLoading(false)
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [userLoading])
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [])
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -271,8 +263,6 @@ export default function ChatPage() {
       currentMessage: currentMessage.trim(),
       isGenerating,
       isSending,
-      user: !!user,
-      user_id: user?.id,
       activeConversationId
     })
     
@@ -288,12 +278,6 @@ export default function ChatPage() {
       return
     }
     
-    // Check if we have a user
-    if (!user) {
-      console.log('No user available')
-      return
-    }
-    
     // If no active conversation, create one
     let conversationId = activeConversationId
     if (!conversationId) {
@@ -301,7 +285,7 @@ export default function ChatPage() {
       try {
         // Generate a smart title from the first message
         const smartTitle = generateConversationTitle(currentMessage)
-        const newConversation = await createConversation(user.id!, smartTitle)
+        const newConversation = await createConversation(smartTitle)
         conversationId = newConversation.id
         setActiveConversationId(conversationId)
         console.log('Created new conversation:', conversationId)
@@ -483,11 +467,8 @@ $$
   }, [])
 
   const createNewConversation = async () => {
-    if (!user) return
-
     try {
       const newConversation = await createConversation(
-        user.id,
         "New Chat",
         selectedSpaceForNewConversation || undefined
       )
@@ -540,9 +521,7 @@ $$
     try {
       await updateConversation(conversationId, { folder: folderId })
       // Reload conversations to update the UI
-      if (user) {
-        await loadConversations(user.id)
-      }
+      await loadConversations()
     } catch (error) {
       console.error('Failed to add folder to conversation:', error)
     }
@@ -554,11 +533,9 @@ $$
       await updateConversation(conversationId, { folder: "" })
       console.log('Successfully removed folder from conversation')
       // Reload conversations to update the UI
-      if (user) {
-        console.log('Reloading conversations for user:', user.id)
-        await loadConversations(user.id)
-        console.log('Conversations reloaded')
-      }
+      console.log('Reloading conversations')
+      await loadConversations()
+      console.log('Conversations reloaded')
     } catch (error) {
       console.error('Failed to remove folder from conversation:', error)
     }
@@ -576,28 +553,13 @@ $$
     setShowAddSpaceDialog(false)
   }
 
-  // Show loading while user is loading or if there's an error
-  if (userLoading || isLoading) {
+  // Show loading while app is initializing
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex items-center space-x-2">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Loading Qlippy...</span>
-        </div>
-      </div>
-    )
-  }
-
-  // Show error if user initialization failed
-  if (userError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2">Error Loading Qlippy</h2>
-          <p className="text-muted-foreground mb-4">{userError}</p>
-          <Button onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
         </div>
       </div>
     )

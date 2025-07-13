@@ -27,7 +27,6 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { useUserContext } from "@/contexts/user-context"
 import { qlippyAPI, Conversation, SearchResult } from "@/lib/api"
 import { useRouter } from "next/navigation"
 
@@ -38,7 +37,6 @@ interface SearchFilters {
 }
 
 export default function SearchPage() {
-  const { user, loading: userLoading } = useUserContext()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = React.useState("")
   const [searchResults, setSearchResults] = React.useState<SearchResult | null>(null)
@@ -56,14 +54,14 @@ export default function SearchPage() {
   const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
 
   const performSearch = React.useCallback(async (query: string) => {
-    if (!user || !query.trim()) {
+    if (!query.trim()) {
       setSearchResults(null)
       return
     }
 
     setIsSearching(true)
     try {
-      const results = await qlippyAPI.searchConversations(user.id, query.trim())
+      const results = await qlippyAPI.searchConversations(query.trim())
       setSearchResults(results)
     } catch (error) {
       console.error('Search failed:', error)
@@ -71,7 +69,7 @@ export default function SearchPage() {
     } finally {
       setIsSearching(false)
     }
-  }, [user])
+  }, [])
 
   // Debounced search effect
   React.useEffect(() => {
@@ -101,7 +99,7 @@ export default function SearchPage() {
   }
 
   const confirmDeleteConversation = async () => {
-    if (conversationToDelete && user) {
+    if (conversationToDelete) {
       try {
         await qlippyAPI.deleteConversation(conversationToDelete)
         // Refresh search results
@@ -187,18 +185,7 @@ export default function SearchPage() {
     return results
   }, [searchResults, filters])
 
-  if (userLoading) {
-    return (
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <div className="flex items-center justify-center h-screen">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    )
-  }
+
 
   return (
     <SidebarProvider>

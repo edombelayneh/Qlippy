@@ -1,45 +1,14 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
-from models import db, User, Conversation, Message, Plugin
+from models import db, Conversation, Message, Plugin
 
 api = Blueprint('api', __name__)
 
-# User routes
-@api.route('/users', methods=['POST'])
-def create_user():
-    data = request.get_json()
-    username = data.get('username')
-    
-    if not username:
-        return jsonify({'error': 'Username is required'}), 400
-    
-    existing_user = User.query.filter_by(username=username).first()
-    if existing_user:
-        return jsonify({'error': 'Username already exists'}), 409
-    
-    user = User(username=username)
-    db.session.add(user)
-    db.session.commit()
-    
-    return jsonify(user.to_dict()), 201
-
-@api.route('/users/<user_id>', methods=['GET'])
-def get_user(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    return jsonify(user.to_dict())
-
 # Conversation routes
-@api.route('/users/<user_id>/conversations', methods=['GET'])
-def get_conversations(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
+@api.route('/conversations', methods=['GET'])
+def get_conversations():
     conversations = []
-    for conv in user.conversations:
+    for conv in Conversation.query.all():
         # Get the last message for preview
         last_message = Message.query.filter_by(conversation_id=conv.id).order_by(Message.timestamp.desc()).first()
         
@@ -53,19 +22,14 @@ def get_conversations(user_id):
     
     return jsonify(conversations)
 
-@api.route('/users/<user_id>/conversations', methods=['POST'])
-def create_conversation(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
+@api.route('/conversations', methods=['POST'])
+def create_conversation():
     data = request.get_json()
     title = data.get('title', 'New Conversation')
     folder = data.get('folder')
     
     conversation = Conversation(
         title=title,
-        user_id=user_id,
         folder=folder
     )
     db.session.add(conversation)
@@ -168,21 +132,13 @@ def delete_message(message_id):
     return jsonify({'message': 'Message deleted successfully'})
 
 # Plugin routes
-@api.route('/users/<user_id>/plugins', methods=['GET'])
-def get_plugins(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    plugins = Plugin.query.filter_by(user_id=user_id).all()
+@api.route('/plugins', methods=['GET'])
+def get_plugins():
+    plugins = Plugin.query.all()
     return jsonify([plugin.to_dict() for plugin in plugins])
 
-@api.route('/users/<user_id>/plugins', methods=['POST'])
-def create_plugin(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
+@api.route('/plugins', methods=['POST'])
+def create_plugin():
     data = request.get_json()
     name = data.get('name')
     description = data.get('description', '')
@@ -192,7 +148,6 @@ def create_plugin(user_id):
         return jsonify({'error': 'Plugin name is required'}), 400
     
     plugin = Plugin(
-        user_id=user_id,
         name=name,
         description=description,
         enabled=enabled
@@ -233,12 +188,8 @@ def delete_plugin(plugin_id):
     return jsonify({'message': 'Plugin deleted successfully'})
 
 # Search routes
-@api.route('/users/<user_id>/search', methods=['GET'])
-def search_conversations(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
+@api.route('/search', methods=['GET'])
+def search_conversations():
     query = request.args.get('q', '').strip()
     if not query:
         return jsonify({'error': 'Search query is required'}), 400
@@ -248,51 +199,64 @@ def search_conversations(user_id):
     
     # Search by conversation title
     title_matches = Conversation.query.filter(
-        Conversation.user_id == user_id,
         Conversation.title.ilike(f'%{query}%')
     ).all()
     
     # Search by message content
-    message_matches = db.session.query(Conversation).join(Message).filter(
-        Conversation.user_id == user_id,
+    message_matches = Message.query.filter(
         Message.content.ilike(f'%{query}%')
-    ).distinct().all()
+    ).all()
+    
+    # Get unique conversations from message matches
+    conversation_ids = set()
+    for message in message_matches:
+        conversation_ids.add(message.conversation_id)
+    
+    content_matches = Conversation.query.filter(
+        Conversation.id.in_(conversation_ids)
+    ).all()
     
     # Combine and deduplicate results
-    all_matches = list(set(title_matches + message_matches))
+    all_conversations = list(set(title_matches + content_matches))
     
-    for conv in all_matches:
-        # Get the last message for preview
-        last_message = Message.query.filter_by(conversation_id=conv.id).order_by(Message.timestamp.desc()).first()
-        
+    for conv in all_conversations:
         # Find matching messages for this conversation
-        matching_messages = Message.query.filter(
-            Message.conversation_id == conv.id,
-            Message.content.ilike(f'%{query}%')
-        ).all()
+        matching_messages = []
+        for message in message_matches:
+            if message.conversation_id == conv.id:
+                # Create a preview of the matching content
+                content = message.content
+                query_lower = query.lower()
+                content_lower = content.lower()
+                
+                # Find the position of the query in the content
+                pos = content_lower.find(query_lower)
+                if pos != -1:
+                    # Create a preview around the match
+                    start = max(0, pos - 50)
+                    end = min(len(content), pos + len(query) + 50)
+                    preview = content[start:end]
+                    
+                    if start > 0:
+                        preview = '...' + preview
+                    if end < len(content):
+                        preview = preview + '...'
+                    
+                    matching_messages.append({
+                        'id': message.id,
+                        'role': message.role,
+                        'content': message.content,
+                        'timestamp': message.timestamp.isoformat(),
+                        'preview': preview
+                    })
         
         conv_data = conv.to_dict()
-        conv_data['last_message_preview'] = (
-            last_message.content[:100] + '...' 
-            if last_message and len(last_message.content) > 100 
-            else (last_message.content if last_message else '')
-        )
-        conv_data['matching_messages'] = [
-            {
-                'id': msg.id,
-                'role': msg.role,
-                'content': msg.content,
-                'timestamp': msg.timestamp.isoformat(),
-                'preview': msg.content[:150] + '...' if len(msg.content) > 150 else msg.content
-            }
-            for msg in matching_messages[:3]  # Limit to 3 matching messages per conversation
-        ]
+        conv_data['matching_messages'] = matching_messages
         conv_data['match_count'] = len(matching_messages)
-        
         conversations.append(conv_data)
     
-    # Sort by relevance (conversations with more matches first, then by last updated)
-    conversations.sort(key=lambda x: (x['match_count'], x['last_updated']), reverse=True)
+    # Sort by relevance (conversations with more matches first)
+    conversations.sort(key=lambda x: x['match_count'], reverse=True)
     
     return jsonify({
         'query': query,
@@ -304,7 +268,7 @@ def search_conversations(user_id):
 @api.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
-        'status': 'healthy', 
-        'message': 'Qlippy backend is running',
+        'status': 'healthy',
+        'message': 'Qlippy API is running',
         'timestamp': datetime.utcnow().isoformat()
     }) 

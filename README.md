@@ -10,7 +10,7 @@ A modern AI chat application with local storage, built with Next.js frontend and
 - 📁 **Conversation Management** - Organize chats with folders
 - 🎨 **Modern UI** - Beautiful, responsive design with dark mode
 - ⚡ **Fast & Lightweight** - Built with Next.js and Flask
-- 🚀 **Single User** - Simple setup, no account creation needed
+- 🚀 **Simple Setup** - No user accounts or authentication required
 
 ## Architecture
 
@@ -115,8 +115,7 @@ The frontend will be available at `http://localhost:3000`
 
 ### 1. First Time Setup
 1. Open `http://localhost:3000` in your browser
-2. The app will automatically create a user account for you
-3. You can start chatting immediately - no setup required!
+2. You can start chatting immediately - no setup required!
 
 ### 2. Using the Chat
 1. **Create a new conversation** - Click "New Chat" in the sidebar
@@ -136,13 +135,9 @@ The frontend will be available at `http://localhost:3000`
 ### Health Check
 - `GET /api/health` - Check server status
 
-### Users
-- `POST /api/users` - Create a new user
-- `GET /api/users/<user_id>` - Get user information
-
 ### Conversations
-- `GET /api/users/<user_id>/conversations` - Get all conversations
-- `POST /api/users/<user_id>/conversations` - Create a new conversation
+- `GET /api/conversations` - Get all conversations
+- `POST /api/conversations` - Create a new conversation
 - `GET /api/conversations/<conversation_id>` - Get conversation with messages
 - `PUT /api/conversations/<conversation_id>` - Update conversation
 - `DELETE /api/conversations/<conversation_id>` - Delete conversation
@@ -153,22 +148,19 @@ The frontend will be available at `http://localhost:3000`
 - `DELETE /api/messages/<message_id>` - Delete a message
 
 ### Plugins
-- `GET /api/users/<user_id>/plugins` - Get all plugins
-- `POST /api/users/<user_id>/plugins` - Create a new plugin
+- `GET /api/plugins` - Get all plugins
+- `POST /api/plugins` - Create a new plugin
 - `PUT /api/plugins/<plugin_id>` - Update a plugin
 - `DELETE /api/plugins/<plugin_id>` - Delete a plugin
 
-## Database Schema
+### Search
+- `GET /api/search?q=<query>` - Search conversations
 
-### Users
-- `id` (UUID) - Primary key
-- `username` (String) - Unique username
-- `created_at` (DateTime) - Account creation timestamp
+## Database Schema
 
 ### Conversations
 - `id` (UUID) - Primary key
 - `title` (String) - Conversation title
-- `user_id` (UUID) - Foreign key to users
 - `folder` (String) - Optional folder categorization
 - `last_updated` (DateTime) - Last activity timestamp
 - `created_at` (DateTime) - Creation timestamp
@@ -182,7 +174,6 @@ The frontend will be available at `http://localhost:3000`
 
 ### Plugins
 - `id` (UUID) - Primary key
-- `user_id` (UUID) - Foreign key to users
 - `name` (String) - Plugin name
 - `description` (Text) - Plugin description
 - `enabled` (Boolean) - Plugin enabled status
@@ -208,7 +199,6 @@ Qlippy/
 ├── components/            # React components
 │   ├── ui/               # UI components
 │   └── ...               # Feature components
-├── contexts/             # React contexts
 ├── hooks/                # React hooks
 ├── lib/                  # Utilities and API
 └── public/               # Static assets
@@ -276,6 +266,7 @@ Edit `backend/config.py` to modify:
 
 2. **Database errors**
    - Delete `backend/qlippy.db` and restart the server
+   - Or run `python reset_db.py` to reset the database
 
 3. **CORS errors**
    - Check CORS origins in `backend/config.py`
@@ -298,35 +289,7 @@ Edit `backend/config.py` to modify:
 ✅ **Backend**: Fully working on `http://localhost:5001`
 ✅ **Database**: SQLite with all tables created
 ✅ **API**: All endpoints tested and working
-✅ **Frontend Integration**: Single user auto-creation
+✅ **Frontend Integration**: Simplified without user management
 ✅ **Message Storage**: All messages saved to database
-✅ **Conversation Management**: Create, load, and delete conversations
-✅ **Simplified Setup**: No username required, auto-creates user
-
-## Next Steps
-
-1. **AI Integration**: Connect to your preferred AI model
-2. **File Uploads**: Implement file attachment functionality
-3. **Voice Integration**: Add voice input/output
-4. **Plugin System**: Implement actual plugin functionality
-5. **Search**: Add conversation search functionality
-6. **Export**: Add conversation export features
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-This project is licensed under the ISC License.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section
-2. Review the API documentation
-3. Open an issue on GitHub
+✅ **Plugin System**: Working without user context
+✅ **Search Functionality**: Working without user context

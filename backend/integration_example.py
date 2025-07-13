@@ -10,24 +10,10 @@ import json
 class QlippyAPI:
     def __init__(self, base_url="http://localhost:5001/api"):
         self.base_url = base_url
-        self.user_id = None
-    
-    def create_user(self, username):
-        """Create a new user"""
-        response = requests.post(f"{self.base_url}/users", json={"username": username})
-        if response.status_code == 201:
-            user_data = response.json()
-            self.user_id = user_data['id']
-            return user_data
-        else:
-            raise Exception(f"Failed to create user: {response.text}")
     
     def get_conversations(self):
-        """Get all conversations for the current user"""
-        if not self.user_id:
-            raise Exception("No user ID set. Create a user first.")
-        
-        response = requests.get(f"{self.base_url}/users/{self.user_id}/conversations")
+        """Get all conversations"""
+        response = requests.get(f"{self.base_url}/conversations")
         if response.status_code == 200:
             return response.json()
         else:
@@ -35,21 +21,18 @@ class QlippyAPI:
     
     def create_conversation(self, title="New Conversation", folder=None):
         """Create a new conversation"""
-        if not self.user_id:
-            raise Exception("No user ID set. Create a user first.")
-        
         data = {"title": title}
         if folder:
             data["folder"] = folder
         
-        response = requests.post(f"{self.base_url}/users/{self.user_id}/conversations", json=data)
+        response = requests.post(f"{self.base_url}/conversations", json=data)
         if response.status_code == 201:
             return response.json()
         else:
             raise Exception(f"Failed to create conversation: {response.text}")
     
     def get_conversation(self, conversation_id):
-        """Get a specific conversation with all messages"""
+        """Get a specific conversation with messages"""
         response = requests.get(f"{self.base_url}/conversations/{conversation_id}")
         if response.status_code == 200:
             return response.json()
@@ -58,43 +41,16 @@ class QlippyAPI:
     
     def add_message(self, conversation_id, role, content):
         """Add a message to a conversation"""
-        response = requests.post(
-            f"{self.base_url}/conversations/{conversation_id}/messages",
-            json={"role": role, "content": content}
-        )
+        data = {"role": role, "content": content}
+        response = requests.post(f"{self.base_url}/conversations/{conversation_id}/messages", json=data)
         if response.status_code == 201:
             return response.json()
         else:
             raise Exception(f"Failed to add message: {response.text}")
     
-    def update_conversation(self, conversation_id, title=None, folder=None):
-        """Update conversation title or folder"""
-        data = {}
-        if title:
-            data["title"] = title
-        if folder:
-            data["folder"] = folder
-        
-        response = requests.put(f"{self.base_url}/conversations/{conversation_id}", json=data)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f"Failed to update conversation: {response.text}")
-    
-    def delete_conversation(self, conversation_id):
-        """Delete a conversation"""
-        response = requests.delete(f"{self.base_url}/conversations/{conversation_id}")
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f"Failed to delete conversation: {response.text}")
-    
     def get_plugins(self):
-        """Get all plugins for the current user"""
-        if not self.user_id:
-            raise Exception("No user ID set. Create a user first.")
-        
-        response = requests.get(f"{self.base_url}/users/{self.user_id}/plugins")
+        """Get all plugins"""
+        response = requests.get(f"{self.base_url}/plugins")
         if response.status_code == 200:
             return response.json()
         else:
@@ -102,70 +58,74 @@ class QlippyAPI:
     
     def create_plugin(self, name, description="", enabled=True):
         """Create a new plugin"""
-        if not self.user_id:
-            raise Exception("No user ID set. Create a user first.")
-        
-        response = requests.post(
-            f"{self.base_url}/users/{self.user_id}/plugins",
-            json={"name": name, "description": description, "enabled": enabled}
-        )
+        data = {"name": name, "description": description, "enabled": enabled}
+        response = requests.post(f"{self.base_url}/plugins", json=data)
         if response.status_code == 201:
             return response.json()
         else:
             raise Exception(f"Failed to create plugin: {response.text}")
-
-def example_usage():
-    """Example of how to use the API from the frontend"""
-    print("🚀 Qlippy Backend Integration Example")
-    print("=" * 50)
     
-    # Initialize API client
+    def search_conversations(self, query):
+        """Search conversations"""
+        response = requests.get(f"{self.base_url}/search?q={query}")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Failed to search conversations: {response.text}")
+
+def main():
+    """Example usage of the Qlippy API"""
     api = QlippyAPI()
     
+    print("🚀 Qlippy API Integration Example")
+    print("=" * 40)
+    
     try:
-        # Create a user
-        print("👤 Creating user...")
-        user = api.create_user("demo_user")
-        print(f"✅ User created: {user['username']}")
+        # Get all conversations
+        print("\n📋 Getting conversations...")
+        conversations = api.get_conversations()
+        print(f"Found {len(conversations)} conversations")
         
-        # Create a conversation
-        print("\n💬 Creating conversation...")
-        conversation = api.create_conversation("My First Chat", "personal")
-        print(f"✅ Conversation created: {conversation['title']}")
+        # Create a new conversation
+        print("\n💬 Creating new conversation...")
+        new_conversation = api.create_conversation("Test Conversation", "work")
+        print(f"Created conversation: {new_conversation['title']} (ID: {new_conversation['id']})")
         
-        # Add some messages
+        # Add messages to the conversation
         print("\n💭 Adding messages...")
-        api.add_message(conversation['id'], "user", "Hello! How are you today?")
-        api.add_message(conversation['id'], "assistant", "Hello! I'm doing great, thank you for asking. How can I help you today?")
-        api.add_message(conversation['id'], "user", "Can you help me with a coding project?")
-        api.add_message(conversation['id'], "assistant", "Of course! I'd be happy to help you with your coding project. What kind of project are you working on?")
+        user_message = api.add_message(new_conversation['id'], "user", "Hello, how are you?")
+        print(f"Added user message: {user_message['content'][:30]}...")
+        
+        assistant_message = api.add_message(new_conversation['id'], "assistant", "Hello! I'm doing well, thank you for asking. How can I help you today?")
+        print(f"Added assistant message: {assistant_message['content'][:30]}...")
         
         # Get the conversation with messages
-        print("\n📖 Retrieving conversation...")
-        full_conversation = api.get_conversation(conversation['id'])
-        print(f"✅ Conversation retrieved with {len(full_conversation['messages'])} messages")
+        print("\n📖 Getting conversation with messages...")
+        conversation = api.get_conversation(new_conversation['id'])
+        print(f"Conversation: {conversation['title']}")
+        print(f"Messages: {len(conversation['messages'])}")
+        for msg in conversation['messages']:
+            print(f"  - {msg['role']}: {msg['content'][:50]}...")
+        
+        # Get plugins
+        print("\n🔌 Getting plugins...")
+        plugins = api.get_plugins()
+        print(f"Found {len(plugins)} plugins")
         
         # Create a plugin
         print("\n🔌 Creating plugin...")
-        plugin = api.create_plugin("Code Assistant", "Helps with programming tasks", True)
-        print(f"✅ Plugin created: {plugin['name']}")
+        new_plugin = api.create_plugin("Test Plugin", "A test plugin", True)
+        print(f"Created plugin: {new_plugin['name']} (ID: {new_plugin['id']})")
         
-        # Get all conversations
-        print("\n📋 Getting all conversations...")
-        conversations = api.get_conversations()
-        print(f"✅ Found {len(conversations)} conversations")
+        # Search conversations
+        print("\n🔍 Searching conversations...")
+        search_results = api.search_conversations("hello")
+        print(f"Search results: {search_results['total_results']} conversations found")
         
-        # Get all plugins
-        print("\n🔌 Getting all plugins...")
-        plugins = api.get_plugins()
-        print(f"✅ Found {len(plugins)} plugins")
-        
-        print("\n" + "=" * 50)
-        print("🎉 Integration example completed successfully!")
-        print("This shows how your frontend can interact with the backend API.")
+        print("\n✅ All operations completed successfully!")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"\n❌ Error: {e}")
 
 if __name__ == "__main__":
-    example_usage() 
+    main() 
