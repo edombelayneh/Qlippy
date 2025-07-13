@@ -10,16 +10,26 @@
         padding: 0;
         background-color: transparent;
         display: flex;
-        justify-content: center;
-        align-items: center;
+        flex-direction: column; /* Stack vertically */
+        justify-content: center;   /* Center vertically */
+        align-items: center;     /* Center horizontally */
         height: 100vh;
         overflow: hidden;
+        -webkit-app-region: no-drag; /* Make the body non-draggable */
       }
+      /* Container removed as it's not needed for this layout */
       #clippy {
         width: 150px;
         height: 150px;
         animation: glow 2s infinite alternate;
         cursor: pointer;
+      }
+      #clippy-container {
+        width: 150px;
+        height: 150px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
 
       @keyframes glow {
@@ -30,10 +40,70 @@
           filter: drop-shadow(0 0 20px #2d96de);
         }
       }
+      .speech-bubble {
+        position: relative; /* Changed from absolute */
+        margin-bottom: 5px; /* Add space between bubble and avatar */
+        background-color: #f0f0f0;
+        color: #333;
+        padding: 10px 15px;
+        border-radius: 20px;
+        font-family: sans-serif;
+        font-size: 14px;
+        width: 180px;
+        text-align: center;
+        opacity: 0;
+        animation: fadeIn 0.5s 0.5s forwards; /* Fade in after a short delay */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      }
+      .speech-bubble::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 10px;
+        border-style: solid;
+        border-color: #f0f0f0 transparent transparent transparent;
+      }
+      #close-btn {
+        position: absolute;
+        top: 5px;
+        right: 8px;
+        width: 16px;
+        height: 16px;
+        background: none;
+        color: #999;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-weight: bold;
+        opacity: 0.5;
+        transition: opacity 0.2s, color 0.2s;
+        font-size: 14px;
+        line-height: 1;
+      }
+      #close-btn:hover {
+        opacity: 1;
+        color: #333;
+      }
+      @keyframes fadeIn {
+        to {
+          opacity: 1;
+        }
+      }
     </style>
   </head>
   <body>
-    <img id="clippy" src="./clippy-avatar.png" alt="Qlippy Assistant" />
+    <div class="speech-bubble">
+      What can I help you with?
+      <div id="close-btn">x</div>
+    </div>
+    <div id="clippy-container">
+      <img id="clippy" src="./clippy-avatar.png" alt="Qlippy Assistant" />
+    </div>
     <script src="./renderer.js"></script>
   </body>
 </html>

@@ -2,6 +2,10 @@
 
 import * as React from "react"
 import { Loader2, Send, Mic, ChevronDown, Check, ThumbsUp, ThumbsDown, Copy, RotateCcw, Pencil, Trash2, MoreHorizontal, Edit, Share, Paperclip, FileText, FileImage, FileVideo, FileAudio, X, File } from "lucide-react"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 import { AppSidebar } from "@/components/app-sidebar"
 import { ConversationList } from "@/components/conversation-list"
@@ -248,7 +252,7 @@ export default function ChatPage() {
   }, [uploadedFiles])
 
   const handleSendMessage = async () => {
-    if (!currentMessage.trim() || isGenerating) return
+    if ((!currentMessage.trim() && uploadedFiles.length === 0) || isGenerating) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -270,32 +274,91 @@ export default function ChatPage() {
       ),
     )
 
+    const query = currentMessage;
     setCurrentMessage("")
     setUploadedFiles([]) // Clear uploaded files after sending
     setIsGenerating(true)
 
-    // Simulate AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `I understand you said: "${userMessage.content}". This is a simulated response using ${availableModels.find(m => m.id === selectedModel)?.name}. In a real implementation, this would be connected to an AI model to generate meaningful responses based on your input.`,
-        timestamp: new Date(),
+    // --- Streaming API Call ---
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+    };
+
+    setConversations((prev) =>
+      prev.map((conv) =>
+        conv.id === activeConversationId
+          ? {
+              ...conv,
+              messages: [...conv.messages, assistantMessage],
+            }
+          : conv,
+      ),
+    );
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: query,
+          // You can pass other parameters here from your state if needed
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        const chunk = decoder.decode(value, { stream: !done });
+        
+        if (chunk) {
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === activeConversationId
+                ? {
+                    ...conv,
+                    messages: conv.messages.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: msg.content + chunk }
+                        : msg
+                    ),
+                    lastUpdated: new Date(),
+                  }
+                : conv
+            )
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch from AI service:", error);
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === activeConversationId
             ? {
                 ...conv,
-                messages: [...conv.messages, assistantMessage],
-                lastUpdated: new Date(),
+                messages: conv.messages.map((msg) =>
+                  msg.id === assistantMessageId
+                    ? { ...msg, content: "Sorry, I am unable to connect to the AI service at the moment. Please ensure the Python server is running and refresh." }
+                    : msg
+                ),
               }
-            : conv,
-        ),
-      )
-      setIsGenerating(false)
-    }, 1500)
+            : conv
+        )
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -565,10 +628,39 @@ export default function ChatPage() {
                   ) : (
                       // AI Response - Free Text with Actions
                       <div className="space-y-3">
-                        <div className="prose prose-sm max-w-none">
-                          <p className="text-foreground whitespace-pre-wrap leading-relaxed">
-                            {message.content}
-                          </p>
+                        <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:p-0">
+                          {message.content ? (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                code({ node, className, children, ...props }) {
+                                  const { ref, ...rest } = props;
+                                  const match = /language-(\w+)/.exec(className || '')
+                                  return match ? (
+                                    <SyntaxHighlighter
+                                      {...rest}
+                                      style={vscDarkPlus as any}
+                                      language={match[1]}
+                                      PreTag="div"
+                                    >
+                                      {String(children).replace(/\n$/, '')}
+                                    </SyntaxHighlighter>
+                                  ) : (
+                                    <code className={className} {...props}>
+                                      {children}
+                                    </code>
+                                  )
+                                }
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          ) : (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm">Thinking...</span>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Action Buttons */}

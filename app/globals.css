@@ -276,4 +276,13 @@ html.starry {
   html.starry {
     color-scheme: dark;
   }
+
+  /* Add styles for markdown code blocks */
+  pre {
+    @apply bg-gray-900 text-white p-4 rounded-md my-4;
+  }
+
+  pre code {
+    @apply text-sm;
+  }
 }
