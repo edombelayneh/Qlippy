@@ -8,7 +8,7 @@ const fs = require("fs");
 const os = require("os");
 
 const accessKey = process.env.PORCUPINE_ACCESS_KEY || "YOUR_ACCESS_KEY_HERE";
-console.log('🔑 Loaded access key:', accessKey ? accessKey.substring(0, 10) + '...' : 'undefined');
+console.log('🔑 Loaded access key:', accessKey ? accessKey.substring(0, 2) + '...' : 'undefined');
 
 let mainWindow;
 let avatarWindow;
@@ -58,13 +58,13 @@ function waitForBackend() {
     });
     
     req.on('error', (err) => {
-      console.log('Waiting for backend to be ready...');
+      console.log('⏳ Waiting for backend to be ready...');
       setTimeout(() => waitForBackend().then(resolve).catch(reject), 1000);
     });
     
     req.setTimeout(5000, () => {
       req.destroy();
-      console.log('Backend timeout, retrying...');
+      console.log('⏳ Backend timeout, retrying...');
       setTimeout(() => waitForBackend().then(resolve).catch(reject), 1000);
     });
     
@@ -79,7 +79,14 @@ function startBackend() {
   // Use the virtual environment's Python
   const pythonPath = path.join(backendPath, 'venv', 'bin', 'python');
   
-  backendProcess = spawn(pythonPath, ['app.py'], {
+  // Check if virtual environment exists
+  if (!require('fs').existsSync(pythonPath)) {
+    console.error('❌ Virtual environment not found. Please run setup-env.sh first.');
+    throw new Error('Virtual environment not found');
+  }
+  
+  // Use run.py instead of app.py for proper startup
+  backendProcess = spawn(pythonPath, ['run.py'], {
     cwd: backendPath,
     stdio: 'pipe'
   });
@@ -96,14 +103,26 @@ function startBackend() {
     console.log(`Backend process exited with code ${code}`);
   });
   
+  backendProcess.on('error', (err) => {
+    console.error('❌ Failed to start backend:', err.message);
+    throw err;
+  });
+  
   // Wait a bit for backend to start
   return new Promise((resolve) => {
-    setTimeout(resolve, 2000);
+    setTimeout(resolve, 3000);
   });
 }
 
 function startFrontend() {
   console.log('🚀 Starting Next.js frontend...');
+  
+  // Check if node_modules exists
+  const nodeModulesPath = path.join(__dirname, 'node_modules');
+  if (!require('fs').existsSync(nodeModulesPath)) {
+    console.error('❌ Node modules not found. Please run npm install first.');
+    throw new Error('Node modules not found');
+  }
   
   frontendProcess = spawn('npm', ['run', 'dev'], {
     cwd: __dirname,
@@ -120,6 +139,11 @@ function startFrontend() {
   
   frontendProcess.on('close', (code) => {
     console.log(`Frontend process exited with code ${code}`);
+  });
+  
+  frontendProcess.on('error', (err) => {
+    console.error('❌ Failed to start frontend:', err.message);
+    throw err;
   });
   
   // Wait for frontend to be ready
@@ -249,20 +273,25 @@ process.on('SIGTERM', () => {
 
 app.whenReady().then(async () => {
   console.log('🎯 Qlippy is starting up...');
+  console.log('=' * 50);
   
   try {
     // Start backend first
+    console.log('📋 Step 1: Starting backend server...');
     await startBackend();
     console.log('✅ Backend started successfully');
     
     // Wait for backend to be ready
+    console.log('📋 Step 2: Waiting for backend to be ready...');
     await waitForBackend();
     
     // Start frontend
+    console.log('📋 Step 3: Starting frontend server...');
     await startFrontend();
     console.log('✅ Frontend started successfully');
     
     // Create avatar window
+    console.log('📋 Step 4: Creating avatar window...');
     createAvatarWindow();
     
     // Check if access key is configured
@@ -273,14 +302,22 @@ app.whenReady().then(async () => {
       console.log("   2. Add it to your .env file: PORCUPINE_ACCESS_KEY=your_key_here");
       console.log("   3. Restart the app");
     } else {
+      console.log('📋 Step 5: Starting hotword detection...');
       startHotwordDetection();
     }
     
     console.log("✅ Voice button in chat is still available for voice input");
     console.log("🎉 Qlippy is ready! Open the main app to start chatting.");
+    console.log("📍 Frontend: http://localhost:3000");
+    console.log("🔗 Backend API: http://localhost:5001/api");
     
   } catch (error) {
     console.error('❌ Error starting services:', error);
+    console.log('💡 Troubleshooting tips:');
+    console.log('   1. Run ./setup-env.sh to set up the environment');
+    console.log('   2. Run npm install to install dependencies');
+    console.log('   3. Check that ports 3000 and 5001 are not in use');
+    process.exit(1);
   }
 });
 

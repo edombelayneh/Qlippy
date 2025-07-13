@@ -51,7 +51,31 @@ This will guide you through the environment configuration process.
 
 ## Quick Start
 
-### Option 1: Use the Development Script (Recommended)
+### Option 1: Use the Python Starter Script (Recommended)
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd Qlippy
+   ```
+
+2. **Set up the environment**
+   ```bash
+   ./setup-env.sh
+   ```
+
+3. **Start the application**
+   ```bash
+   python start.py
+   ```
+
+This script will:
+- Check all dependencies (Python, Node.js, virtual environment)
+- Start the Flask backend server on port 5001
+- Start the Next.js frontend server on port 3000
+- Provide graceful shutdown with Ctrl+C
+
+### Option 2: Use the Development Script
 
 1. **Clone the repository**
    ```bash
@@ -179,9 +203,52 @@ The frontend will be available at `http://localhost:3000`
 - `enabled` (Boolean) - Plugin enabled status
 - `created_at` (DateTime) - Creation timestamp
 
-## Development
+## Troubleshooting
 
-### Project Structure
+### Common Issues
+
+#### 1. Infinite API Request Loop
+If you see repeated API calls to `/api/conversations`, this has been fixed in the latest version. The issue was caused by a React useEffect dependency that was causing infinite re-renders.
+
+#### 2. Backend Server Not Starting
+- Ensure you've run `./setup-env.sh` to create the virtual environment
+- Check that Python 3.10+ is installed
+- Verify the backend directory contains `venv/` folder
+
+#### 3. Frontend Server Not Starting
+- Run `npm install` to install dependencies
+- Ensure Node.js 18+ is installed
+- Check that `node_modules/` directory exists
+
+#### 4. Port Already in Use
+If you get "port already in use" errors:
+```bash
+# Kill processes on ports 3000 and 5001
+lsof -ti:3000 | xargs kill -9
+lsof -ti:5001 | xargs kill -9
+```
+
+#### 5. Missing run.py File
+The `run.py` file in the root directory has been created to properly start the backend server. If you encounter issues, use:
+```bash
+python run.py  # Starts backend only
+python start.py  # Starts both frontend and backend
+```
+
+### Debug Mode
+To run with verbose logging:
+```bash
+# Backend only
+cd backend && python run.py
+
+# Frontend only
+npm run dev
+
+# Both with logging
+python start.py
+```
+
+## Development
 ```
 Qlippy/
 ├── app/                    # Next.js app directory

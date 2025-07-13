@@ -188,17 +188,11 @@ export default function ChatPage() {
     currentConversationMessages: currentConversation?.messages?.length || 0
   })
 
-  // Load conversations on component mount
+  // Load conversations on component mount - only once
   React.useEffect(() => {
-    console.log('useEffect for loading conversations:', {
-      conversationsLoading,
-      shouldLoad: !conversationsLoading
-    })
-    
-    if (!conversationsLoading) {
-      loadConversations()
-    }
-  }, [conversationsLoading, loadConversations])
+    console.log('useEffect for loading conversations on mount')
+    loadConversations()
+  }, []) // Empty dependency array - only run once on mount
 
   // Set first conversation as active if none selected
   React.useEffect(() => {
@@ -215,7 +209,7 @@ export default function ChatPage() {
       setActiveConversationId(conversations[0].id)
       loadConversation(conversations[0].id)
     }
-  }, [conversations, activeConversationId, loadConversation])
+  }, [conversations, activeConversationId]) // Removed loadConversation from dependencies to prevent infinite loop
 
   // Initialize app
   React.useEffect(() => {
