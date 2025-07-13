@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qlippy</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: transparent;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+      }
+      
+      #clippy {
+        width: 150px;
+        height: 150px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        opacity: 0.9;
+        filter: drop-shadow(0 0 5px rgba(45, 150, 222, 0.5));
+      }
+
+      #clippy.active {
+        transform: scale(1.1);
+        opacity: 1;
+        animation: activate-glow 1s infinite alternate;
+      }
+
+      #clippy.recording {
+        animation: recording-pulse 1.5s infinite alternate;
+        transform: scale(1.05);
+      }
+
+      #clippy.speaking {
+        animation: speaking-bounce 1s infinite;
+        transform: scale(1.05);
+      }
+
+      #clippy.error {
+        animation: error-shake 0.5s ease-in-out;
+        filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.7));
+      }
+
+      @keyframes activate-glow {
+        from {
+          filter: drop-shadow(0 0 10px rgba(45, 150, 222, 0.7));
+        }
+        to {
+          filter: drop-shadow(0 0 25px rgba(45, 150, 222, 0.9));
+        }
+      }
+
+      @keyframes recording-pulse {
+        from {
+          filter: drop-shadow(0 0 10px rgba(255, 68, 68, 0.7));
+          transform: scale(1.05);
+        }
+        to {
+          filter: drop-shadow(0 0 20px rgba(255, 68, 68, 0.9));
+          transform: scale(1.1);
+        }
+      }
+
+      @keyframes speaking-bounce {
+        0%, 100% { 
+          transform: scale(1.05);
+          filter: drop-shadow(0 0 15px rgba(68, 255, 68, 0.8));
+        }
+        50% { 
+          transform: scale(1.08);
+          filter: drop-shadow(0 0 20px rgba(68, 255, 68, 0.9));
+        }
+      }
+
+      @keyframes error-shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-10px); }
+        40% { transform: translateX(10px); }
+        60% { transform: translateX(-5px); }
+        80% { transform: translateX(5px); }
+      }
+
+      #status-text {
+        display: none; /* Hide status text completely */
+      }
+
+      /* Add a subtle hover effect */
+      #clippy:hover {
+        transform: scale(1.02);
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <img id="qlippy" src="../web/public/qlippy-avatar.png" alt="Qlippy Assistant" />
+    <div id="status-text"></div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
