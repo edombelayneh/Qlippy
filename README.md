@@ -1,6 +1,6 @@
 # Qlippy
 
-# If on Windows (Snapdragon X Elite) please clone from karim-own branch
+## If on Windows (Snapdragon X Elite) please clone from karim-owen branch
 
 A modern AI chat application with local storage, built with Next.js frontend and Flask backend.
 
