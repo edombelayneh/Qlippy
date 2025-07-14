@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,6 +9,12 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+
+# Python virtual environment
+.env/
+venv/
+env/
+ENV/
 
 # testing
 /coverage
@@ -42,4 +48,53 @@ next-env.d.ts
 
 /changes-from-llm-branch
 
-qlippy.db
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+qlippy.db*
+
+# Large model files
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Audio model directories
+packages/server/llm/
+packages/server/models/
+packages/server/assets/models/
+
+# Whisper models
+**/whisper-*/
+**/models/whisper-*/
+
+# Chroma database
+chroma_db/
+**/chroma_db/
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
