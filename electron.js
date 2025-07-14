@@ -84,10 +84,11 @@ function startHotwordDetection() {
       const keywordIndex = porcupine.process(pcm);
       if (keywordIndex !== -1) {
         console.log('"Hey Qlippy" detected!');
-        if (companionWindow) {
-          companionWindow.show();
-          companionWindow.focus();
+        if (!companionWindow) {
+          createCompanionWindow();
         }
+        companionWindow.show();
+        companionWindow.focus();
       }
     }, 10);
   } catch (err) {
@@ -112,10 +113,10 @@ if (!gotTheLock) {
   app.whenReady().then(() => {
     createCompanionWindow();
     // For testing, show the companion window immediately
-    if (companionWindow) {
-      companionWindow.show();
-      companionWindow.focus();
-    }
+    // if (companionWindow) {
+    //   companionWindow.show();
+    //   companionWindow.focus();
+    // }
     startHotwordDetection();
     registerFileSystemHandlers(ipcMain, shell);
   });
