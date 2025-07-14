@@ -22,6 +22,8 @@ ENV/
 # next.js
 /.next/
 /out/
+**/.next/
+**/out/
 
 # production
 /build
