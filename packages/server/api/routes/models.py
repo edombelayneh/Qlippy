@@ -5,7 +5,8 @@ Clean API endpoints for model management
 
 from fastapi import APIRouter, HTTPException, status
 from typing import List, Dict, Any
-from services.settings_service import settings_service
+from services.models_service import models_service
+from services.llm_service import llm_service
 from config.models import ModelRequest, SettingsResponse
 
 router = APIRouter()
@@ -18,7 +19,7 @@ router = APIRouter()
 async def get_models() -> Dict[str, Any]:
     """Get all available models"""
     try:
-        data = settings_service.get_models()
+        data = models_service.get_models()
         return {"status": "success", "data": data}
     except Exception as e:
         print(f"Error getting models: {e}")
@@ -31,7 +32,7 @@ async def get_models() -> Dict[str, Any]:
 async def add_model(model: ModelRequest) -> SettingsResponse:
     """Add a new model"""
     try:
-        success = settings_service.add_model(
+        success = models_service.add_model(
             model.name, 
             model.file_path, 
             model.file_size_display
@@ -57,7 +58,7 @@ async def add_model(model: ModelRequest) -> SettingsResponse:
 async def delete_model(model_id: str) -> SettingsResponse:
     """Delete a model"""
     try:
-        success = settings_service.delete_model(model_id)
+        success = models_service.delete_model(model_id)
         if success:
             return SettingsResponse(status="success", message="Model deleted successfully")
         else:
@@ -76,7 +77,7 @@ async def delete_model(model_id: str) -> SettingsResponse:
 async def activate_model(model_id: str) -> SettingsResponse:
     """Activate a model"""
     try:
-        success = settings_service.activate_model(model_id)
+        success = models_service.set_active_model(model_id)
         if success:
             return SettingsResponse(
                 status="success", 
@@ -99,7 +100,7 @@ async def activate_model(model_id: str) -> SettingsResponse:
 async def update_model_tool_calling(model_id: str, enabled: bool) -> SettingsResponse:
     """Update tool calling setting for a model"""
     try:
-        success = settings_service.update_model_tool_calling(model_id, enabled)
+        success = models_service.update_model_tool_calling(model_id, enabled)
         if success:
             return SettingsResponse(
                 status="success", 
@@ -121,7 +122,7 @@ async def update_model_tool_calling(model_id: str, enabled: bool) -> SettingsRes
 async def get_model_loading_status() -> Dict[str, Any]:
     """Get model loading status"""
     try:
-        data = settings_service.get_model_loading_status()
+        data = llm_service.get_loading_status()
         return {"status": "success", "data": data}
     except Exception as e:
         print(f"Error getting model loading status: {e}")

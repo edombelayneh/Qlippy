@@ -5,6 +5,7 @@ from pathlib import Path
 from llama_cpp import Llama
 from config.settings import settings
 from utils.token_utils import estimate_token_count, smart_max_tokens
+from services.models_service import models_service
 from services.settings_service import SettingsService
 
 class LLMService:
@@ -17,9 +18,8 @@ class LLMService:
     def get_active_model_from_db(self) -> Optional[dict]:
         """Get the active model from database"""
         try:
-            # Import here to avoid circular imports
-            from services.settings_service import settings_service
-            models = settings_service.get_models()
+            # Use the proper ModelsService
+            models = models_service.get_models()
             
             # Find the active model
             for model in models:

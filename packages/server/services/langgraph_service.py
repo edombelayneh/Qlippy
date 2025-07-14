@@ -20,7 +20,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
-from services.settings_service import settings_service
+from services.tools_service import tools_service
 from services.llm_service import llm_service
 
 # =============================================================================
@@ -185,7 +185,7 @@ class LangGraphService:
     def _load_dynamic_tools(self):
         """Load enabled tools from the database and inject them as callable tools."""
         try:
-            db_tools = settings_service.get_tools()
+            db_tools = tools_service.get_tools()
             for tool in db_tools:
                 if not tool.get('is_enabled') or not tool.get('script') or not tool.get('name'):
                     continue
