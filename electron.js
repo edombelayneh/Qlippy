@@ -2,10 +2,10 @@ const { app, BrowserWindow, screen, ipcMain, shell } = require("electron");
 const path = require("path");
 const { registerFileSystemHandlers } = require('./backend/file-system-handler.js')
 
-// const { Porcupine } = require("@picovoice/porcupine-node");
-// const { PvRecorder } = require("@picovoice/pvrecorder-node");
+const { Porcupine } = require("@picovoice/porcupine-node");
+const { PvRecorder } = require("@picovoice/pvrecorder-node");
 
-// const accessKey = "eDGFUBlFfqwPu09E2Umkne947P+RobsTREdrWjsERC61iYgk16vy7w==";
+const accessKey = "bfcJpM8gWrVEuzU6We6fuKEeElkasMAoni2knfCRbCssZTo8ZhqO7w==";
 
 let mainWindow;
 let companionWindow;
@@ -67,33 +67,33 @@ function createCompanionWindow() {
   });
 }
 
-// function startHotwordDetection() {
-//   try {
-//     const keywordPaths = [path.join(__dirname, "Hey-Qlippy.ppn")];
-//     const sensitivities = [0.5];
-//     const porcupine = new Porcupine(accessKey, keywordPaths, sensitivities);
-//     const frameLength = porcupine.frameLength;
-//     const recorder = new PvRecorder(frameLength, -1);
-//     recorder.start();
+function startHotwordDetection() {
+  try {
+    const keywordPaths = [path.join(__dirname, "Hey-Qlippy.ppn")];
+    const sensitivities = [0.5];
+    const porcupine = new Porcupine(accessKey, keywordPaths, sensitivities);
+    const frameLength = porcupine.frameLength;
+    const recorder = new PvRecorder(frameLength, -1);
+    recorder.start();
 
-//     console.log(`Using device: ${recorder.getSelectedDevice()}`);
-//     console.log('Listening for "Hey Qlippy"...');
+    console.log(`Using device: ${recorder.getSelectedDevice()}`);
+    console.log('Listening for "Hey Qlippy"...');
 
-//     setInterval(async () => {
-//       const pcm = await recorder.read();
-//       const keywordIndex = porcupine.process(pcm);
-//       if (keywordIndex !== -1) {
-//         console.log('"Hey Qlippy" detected!');
-//         if (companionWindow) {
-//           companionWindow.show();
-//           companionWindow.focus();
-//         }
-//       }
-//     }, 10);
-//   } catch (err) {
-//     console.error("Error initializing Picovoice:", err);
-//   }
-// }
+    setInterval(async () => {
+      const pcm = await recorder.read();
+      const keywordIndex = porcupine.process(pcm);
+      if (keywordIndex !== -1) {
+        console.log('"Hey Qlippy" detected!');
+        if (companionWindow) {
+          companionWindow.show();
+          companionWindow.focus();
+        }
+      }
+    }, 10);
+  } catch (err) {
+    console.error("Error initializing Picovoice:", err);
+  }
+}
 
 // Ensure only one instance of the app can run
 const gotTheLock = app.requestSingleInstanceLock();
@@ -116,7 +116,7 @@ if (!gotTheLock) {
       companionWindow.show();
       companionWindow.focus();
     }
-    // startHotwordDetection();
+    startHotwordDetection();
     registerFileSystemHandlers(ipcMain, shell);
   });
 }

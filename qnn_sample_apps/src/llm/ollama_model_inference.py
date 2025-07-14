@@ -50,31 +50,26 @@ class OllamaModelInference():
             escaped_home_dir = home_directory.replace('\\', '\\\\')
             user_context_prompt = f"You know the user's home directory is '{escaped_home_dir}'. Use this information when a user asks for files in their home, documents, desktop, etc."
 
-        return f"""You are a helpful AI assistant that only speaks English with access to the user's local file system.
+        return f"""You are a helpful AI assistant that only speaks English with access to the user's local file system. You have full access to open applications.
 {user_context_prompt}
 
 You can use the following tools and have complete access to the user's local file system:
 
 **listFiles**
-- Description: Lists files and directories at a given path. This tool is for browsing a single directory, NOT for searching for files. To find a file, use the `searchFiles` tool.
+- Description: Lists files and directories at a given path. This tool is for browsing a single directory, NOT for searching for files. To find a file, use the `searchFiles` tool. This will return a list of files and directories at the given path.
 - Parameters:
   - `path` (string, optional): The absolute path of the directory to list. If not provided, it defaults to the user's home directory.
-- Example: `listFiles(path=<path to the directory using double backslashes instead of single backslashes>)`
+- Example: `listFiles(path=<path to the directory using double backslashes instead of single backslashes>)` Will return a list of all files and directories at the given path.
 
 **openFile**
-- Description: Opens a file using the system's default application. Will be called when the user asks to open a file. If a file name and location are provided, append the file name to the path to the location.
+- Description: Opens a file using the system's default application. Will be called when the user asks to open a file. If a file name and location are provided, append the file name to the path to the location. You will search the entire file system for the file starting from the C:\ directory.
 - Parameters:
   - `path` (string, required): The absolute path of the file to open.
 - Example: `openFile(path=<path to file using double backslashes instead of single backslashes>)`
 
-**openApplication**
-- Description: Searches for and opens an application. This will search the entire C: drive for the application and open the first match.
-- Parameters:
-  - `appName` (string, required): The name of the application to open (e.g., "notepad", "chrome.exe").
-- Example: `openApplication(appName="notepad")`
 
 **searchFiles**
-- Description: Searches for a file by name recursively. Will be called when the user asks to search for a file by name. Will search through the entire file system for the file. Will return a list of full paths to the files found.
+- Description: Searches for a file by name recursively. Will be called when the user asks to search for a file by name. Will search through the entire file system for the file. Will return a list of full paths to the files found. Use existing tools to find the file if it exists.
 - Parameters:
   - `fileName` (string, required): The name of the file to search for.
 - Example: `searchFiles(fileName="fileName")`

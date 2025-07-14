@@ -59,10 +59,10 @@ export function CompanionChat() {
           { role: 'assistant', content: JSON.stringify(toolResponse.tool_call), id: '' },
           { role: 'tool' as const, content: JSON.stringify(toolResponse.result), id: '' }
         ];
-        body = JSON.stringify({ messages: conversationHistory });
+        body = JSON.stringify({ query: query, messages: conversationHistory });
       } else {
         const conversationHistory = messages.filter(m => m.id !== messageId);
-        body = JSON.stringify({ messages: conversationHistory });
+        body = JSON.stringify({ query: query, messages: conversationHistory });
       }
 
       const response = await fetch("http://127.0.0.1:8000/api/generate", {
